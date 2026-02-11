@@ -3,7 +3,8 @@
 // Force dynamic rendering to avoid build-time errors
 export const dynamic = 'force-dynamic';
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import type { Alert as AlertType } from "@/types/api";
 import { 
   Bell, 
   Search, 
@@ -30,11 +31,10 @@ import { cn } from "@/lib/utils";
  * SECONDARY ACTIONS = Clinical interventions (Call, Message) that do NOT change alert state
  */
 
-type AlertStatus = "new" | "acknowledged" | "resolved";
-
-interface Alert {
-  id: number;
-  status: AlertStatus;
+// Legacy Alert interface for UI compatibility
+interface UIAlert {
+  id: string;
+  status: "new" | "acknowledged" | "resolved";
   level: "critical" | "moderate" | "low";
   time: string;
   title: string;
@@ -51,8 +51,8 @@ interface Alert {
   resolution?: string;
 }
 
-// Demo alert data with explicit status
-const initialAlerts: Alert[] = [
+// Demo alert data with explicit status (fallback)
+const demoAlerts: UIAlert[] = [
   {
     id: 1,
     status: "new",
@@ -129,8 +129,72 @@ const initialAlerts: Alert[] = [
 ];
 
 export default function AlertManagement() {
-  const [alerts, setAlerts] = useState<Alert[]>(initialAlerts);
-  const [statusFilter, setStatusFilter] = useState<AlertStatus | "all">("all");
+  const [alerts, setAlerts] = useState<UIAlert[]>([]);
+  const [statusFilter, setStatusFilter] = useState<"new" | "acknowledged" | "resolved" | "all">("all");
+  const [loading, setLoading] = useState(true);
+  
+  // Fetch alerts from API
+  useEffect(() => {
+    fetchAlerts();
+  }, []);
+  
+  const fetchAlerts = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/alerts');
+      if (!response.ok) {
+        throw new Error('Failed to fetch alerts');
+      }
+      const data = await response.json();
+      
+      // Convert Firebase alerts to UI format
+      const uiAlerts: UIAlert[] = data.alerts.map((alert: AlertType) => {
+        const createdDate = new Date(alert.createdAt);
+        const now = new Date();
+        const hoursDiff = Math.floor((now.getTime() - createdDate.getTime()) / (1000 * 60 * 60));
+        
+        let timeStr = "";
+        if (hoursDiff < 1) timeStr = "Just now";
+        else if (hoursDiff < 24) timeStr = `${hoursDiff} hour${hoursDiff > 1 ? 's' : ''} ago`;
+        else timeStr = `${Math.floor(hoursDiff / 24)} day${Math.floor(hoursDiff / 24) > 1 ? 's' : ''} ago`;
+        
+        return {
+          id: alert.id,
+          status: alert.status,
+          level: alert.severity === "critical" ? "critical" : alert.severity === "warning" ? "moderate" : "low",
+          time: timeStr,
+          title: alert.title,
+          patient: alert.patientName,
+          patientId: alert.patientId,
+          location: "San Francisco, CA", // Default location
+          bp: alert.triggerValue || "—/—",
+          desc: alert.description,
+          avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${alert.patientId}`,
+          acknowledgedAt: alert.acknowledgedAt ? formatRelativeTime(alert.acknowledgedAt) : undefined,
+          resolvedAt: alert.resolvedAt ? formatRelativeTime(alert.resolvedAt) : undefined,
+          resolution: alert.resolution,
+        };
+      });
+      
+      setAlerts(uiAlerts);
+    } catch (err) {
+      console.error('Error fetching alerts:', err);
+      // Fallback to demo data on error
+      setAlerts(demoAlerts);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const formatRelativeTime = (isoString: string) => {
+    const date = new Date(isoString);
+    const now = new Date();
+    const hoursDiff = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
+    
+    if (hoursDiff < 1) return "Just now";
+    if (hoursDiff < 24) return `${hoursDiff} hour${hoursDiff > 1 ? 's' : ''} ago`;
+    return `${Math.floor(hoursDiff / 24)} day${Math.floor(hoursDiff / 24) > 1 ? 's' : ''} ago`;
+  };
 
   // Calculate stats from current alert state
   const stats = {
@@ -146,12 +210,25 @@ export default function AlertManagement() {
    * Clinician has reviewed this alert and is aware of it.
    * Does NOT mean the issue is resolved - just that it's being handled.
    */
-  const acknowledgeAlert = (alertId: number) => {
-    setAlerts(prev => prev.map(alert => 
-      alert.id === alertId 
-        ? { ...alert, status: "acknowledged" as AlertStatus, acknowledgedAt: "Just now" }
-        : alert
-    ));
+  const acknowledgeAlert = async (alertId: string) => {
+    try {
+      const response = await fetch('/api/alerts', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ alertId, status: 'acknowledged' }),
+      });
+      
+      if (!response.ok) throw new Error('Failed to acknowledge alert');
+      
+      // Update local state
+      setAlerts(prev => prev.map(alert => 
+        alert.id === alertId 
+          ? { ...alert, status: "acknowledged", acknowledgedAt: "Just now" }
+          : alert
+      ));
+    } catch (err) {
+      console.error('Error acknowledging alert:', err);
+    }
   };
 
   /**
@@ -159,12 +236,25 @@ export default function AlertManagement() {
    * Clinician has made a clinical decision and this alert can be closed.
    * This is the terminal state - alert is considered handled.
    */
-  const resolveAlert = (alertId: number) => {
-    setAlerts(prev => prev.map(alert => 
-      alert.id === alertId 
-        ? { ...alert, status: "resolved" as AlertStatus, resolvedAt: "Just now" }
-        : alert
-    ));
+  const resolveAlert = async (alertId: string) => {
+    try {
+      const response = await fetch('/api/alerts', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ alertId, status: 'resolved', resolution: 'Issue addressed by clinician' }),
+      });
+      
+      if (!response.ok) throw new Error('Failed to resolve alert');
+      
+      // Update local state
+      setAlerts(prev => prev.map(alert => 
+        alert.id === alertId 
+          ? { ...alert, status: "resolved", resolvedAt: "Just now" }
+          : alert
+      ));
+    } catch (err) {
+      console.error('Error resolving alert:', err);
+    }
   };
 
   /**
@@ -172,12 +262,12 @@ export default function AlertManagement() {
    * These are clinical interventions that do NOT change alert state.
    * Calling or messaging a patient is an action, but doesn't mean the alert is resolved.
    */
-  const handleCall = (alert: Alert) => {
+  const handleCall = (alert: UIAlert) => {
     console.log(`Initiating call to ${alert.patient}`);
     // TODO: Integrate with calling system
   };
 
-  const handleMessage = (alert: Alert) => {
+  const handleMessage = (alert: UIAlert) => {
     console.log(`Opening message composer for ${alert.patient}`);
     // TODO: Open message modal
   };

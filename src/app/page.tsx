@@ -42,6 +42,7 @@ export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<"urgency" | "name" | "adherence">("urgency");
   const [patients, setPatients] = useState<PatientProfile[]>([]);
+  const [patientReadings, setPatientReadings] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -60,6 +61,28 @@ export default function Dashboard() {
       }
       const data = await response.json();
       setPatients(data.patients || []);
+      
+      // Fetch latest readings for each patient
+      const readingsPromises = data.patients.map(async (patient: PatientProfile) => {
+        try {
+          const readingsRes = await fetch(`/api/readings?patientId=${patient.id}&limit=1`);
+          if (readingsRes.ok) {
+            const readingsData = await readingsRes.json();
+            return { patientId: patient.id, readings: readingsData.readings };
+          }
+        } catch (err) {
+          console.error(`Failed to fetch readings for ${patient.id}:`, err);
+        }
+        return { patientId: patient.id, readings: [] };
+      });
+      
+      const allReadings = await Promise.all(readingsPromises);
+      const readingsMap: Record<string, any> = {};
+      allReadings.forEach(({ patientId, readings }) => {
+        readingsMap[patientId] = readings[0] || null;
+      });
+      setPatientReadings(readingsMap);
+      
     } catch (err) {
       console.error('Error fetching patients:', err);
       setError(err instanceof Error ? err.message : 'Failed to load patients');
@@ -70,21 +93,50 @@ export default function Dashboard() {
 
   // Convert PatientProfile to PatientSummary format for compatibility
   const patientSummaries: PatientSummary[] = useMemo(() => {
-    return patients.map(p => ({
-      id: p.id,
-      name: `${p.firstName} ${p.lastName}`,
-      age: new Date().getFullYear() - new Date(p.dateOfBirth).getFullYear(),
-      priority: mapRiskLevelToPriority(p.riskLevel),
-      condition: p.diagnosis.join(', '),
-      bp: "—/—", // Will be populated from readings
-      bpTime: "No recent data",
-      trend: "stable" as const,
-      adherence: 85, // TODO: Calculate from readings
-      lastContact: "Unknown",
-      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${p.id}`,
-      missedReadings: 0,
-    }));
-  }, [patients]);
+    return patients.map(p => {
+      const latestReading = patientReadings[p.id];
+      const lastContactDate = p.lastContact ? new Date(p.lastContact) : null;
+      const now = new Date();
+      
+      // Format last contact as relative time
+      let lastContactStr = "No recent contact";
+      if (lastContactDate) {
+        const daysDiff = Math.floor((now.getTime() - lastContactDate.getTime()) / (1000 * 60 * 60 * 24));
+        if (daysDiff === 0) lastContactStr = "Today";
+        else if (daysDiff === 1) lastContactStr = "Yesterday";
+        else if (daysDiff < 7) lastContactStr = `${daysDiff} days ago`;
+        else if (daysDiff < 30) lastContactStr = `${Math.floor(daysDiff / 7)} weeks ago`;
+        else lastContactStr = `${Math.floor(daysDiff / 30)} months ago`;
+      }
+      
+      // Format BP reading
+      let bpStr = "—/—";
+      let bpTimeStr = "No recent data";
+      if (latestReading) {
+        bpStr = `${latestReading.systolic}/${latestReading.diastolic}`;
+        const readingDate = new Date(latestReading.timestamp);
+        const hoursDiff = Math.floor((now.getTime() - readingDate.getTime()) / (1000 * 60 * 60));
+        if (hoursDiff < 1) bpTimeStr = "Just now";
+        else if (hoursDiff < 24) bpTimeStr = `${hoursDiff}h ago`;
+        else bpTimeStr = `${Math.floor(hoursDiff / 24)}d ago`;
+      }
+      
+      return {
+        id: p.id,
+        name: `${p.firstName} ${p.lastName}`,
+        age: new Date().getFullYear() - new Date(p.dateOfBirth).getFullYear(),
+        priority: mapRiskLevelToPriority(p.riskLevel),
+        condition: p.diagnosis.join(', '),
+        bp: bpStr,
+        bpTime: bpTimeStr,
+        trend: latestReading?.status === 'critical' || latestReading?.status === 'high' ? 'up' as const : 'stable' as const,
+        adherence: 85, // TODO: Calculate from readings
+        lastContact: lastContactStr,
+        avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${p.id}`,
+        missedReadings: 0,
+      };
+    });
+  }, [patients, patientReadings]);
 
   // Calculate stats from real patient data
   const stats = useMemo(() => {

@@ -68,6 +68,7 @@ const patients = [
     assignedClinicianId: "clinician-001",
     createdAt: new Date("2025-01-15").toISOString(),
     updatedAt: now.toISOString(),
+    lastContact: new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString(), // 2 days ago
     status: "active" as const,
   },
   {
@@ -104,6 +105,7 @@ const patients = [
     assignedClinicianId: "clinician-001",
     createdAt: new Date("2025-01-20").toISOString(),
     updatedAt: now.toISOString(),
+    lastContact: new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000).toISOString(), // 5 days ago
     status: "active" as const,
   },
   {
@@ -135,6 +137,7 @@ const patients = [
     assignedClinicianId: "clinician-001",
     createdAt: new Date("2025-01-10").toISOString(),
     updatedAt: now.toISOString(),
+    lastContact: new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000).toISOString(), // 1 day ago (critical patient)
     status: "active" as const,
   },
   {
@@ -160,6 +163,7 @@ const patients = [
     assignedClinicianId: "clinician-001",
     createdAt: new Date("2024-11-01").toISOString(),
     updatedAt: now.toISOString(),
+    lastContact: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days ago
     status: "active" as const,
   },
 ];

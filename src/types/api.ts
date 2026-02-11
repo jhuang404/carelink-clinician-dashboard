@@ -51,6 +51,7 @@ export interface PatientProfile {
   // Timestamps
   createdAt: string;
   updatedAt: string;
+  lastContact?: string; // Last interaction date (ISO string)
   status: PatientStatus;
 }
 
