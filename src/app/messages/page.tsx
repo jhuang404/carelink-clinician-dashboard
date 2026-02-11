@@ -3,7 +3,7 @@
 // Force dynamic rendering to avoid build-time errors
 export const dynamic = 'force-dynamic';
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
   Search,
@@ -39,7 +39,7 @@ import type { Conversation, Message, ParticipantRole } from "@/types/messages";
  * - Audit logging for HIPAA compliance
  */
 
-export default function MessagesPage() {
+function MessagesContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -424,5 +424,21 @@ export default function MessagesPage() {
         )}
       </div>
     </div>
+  );
+}
+
+// Wrap in Suspense to prevent build-time errors with useSearchParams
+export default function MessagesPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-magenta-600"></div>
+          <p className="mt-2 text-gray-600">Loading messages...</p>
+        </div>
+      </div>
+    }>
+      <MessagesContent />
+    </Suspense>
   );
 }
