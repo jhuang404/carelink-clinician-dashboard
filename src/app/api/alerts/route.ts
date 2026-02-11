@@ -32,22 +32,27 @@ export async function GET(request: NextRequest) {
 
     // Firebase is configured - fetch from Firestore
     const alertsRef = getCollection("alerts");
-    let query = alertsRef.orderBy("createdAt", "desc");
-
-    // Apply filters
-    if (status) {
-      query = query.where("status", "==", status);
-    }
-    if (severity) {
-      query = query.where("severity", "==", severity);
-    }
-
-    const snapshot = await query.get();
-    const alerts: Alert[] = [];
+    // Simple query without orderBy to avoid index requirement
+    const snapshot = await alertsRef.get();
+    
+    let alerts: Alert[] = [];
 
     snapshot.forEach((doc) => {
       alerts.push({ id: doc.id, ...doc.data() } as Alert);
     });
+
+    // Apply filters in memory
+    if (status) {
+      alerts = alerts.filter(a => a.status === status);
+    }
+    if (severity) {
+      alerts = alerts.filter(a => a.severity === severity);
+    }
+    
+    // Sort by createdAt in memory
+    alerts = alerts.sort((a, b) => 
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
 
     return NextResponse.json({ alerts, total: alerts.length });
 

@@ -72,30 +72,35 @@ export async function GET(request: NextRequest) {
 
     // Firebase is configured - fetch from Firestore
     const patientsRef = getCollection("patients");
-    let query = patientsRef.orderBy("updatedAt", "desc");
-
-    // Apply filters
-    if (status) {
-      query = query.where("status", "==", status);
-    }
-    if (riskLevel) {
-      query = query.where("riskLevel", "==", riskLevel);
-    }
-
-    const snapshot = await query.get();
+    // Simple query without orderBy to avoid index requirement
+    const snapshot = await patientsRef.get();
+    
     let patients: PatientProfile[] = [];
 
     snapshot.forEach((doc) => {
       patients.push({ id: doc.id, ...doc.data() } as PatientProfile);
     });
 
-    // Apply search filter (client-side for simplicity)
+    // Apply filters in memory
+    if (status) {
+      patients = patients.filter(p => p.status === status);
+    }
+    if (riskLevel) {
+      patients = patients.filter(p => p.riskLevel === riskLevel);
+    }
+    
+    // Apply search filter
     if (search) {
       patients = patients.filter(p =>
         `${p.firstName} ${p.lastName}`.toLowerCase().includes(search) ||
         p.id.toLowerCase().includes(search)
       );
     }
+    
+    // Sort by updatedAt in memory
+    patients = patients.sort((a, b) => 
+      new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+    );
 
     const response: GetPatientsResponse = {
       patients,

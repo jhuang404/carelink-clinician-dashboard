@@ -57,17 +57,21 @@ export async function GET(request: NextRequest) {
     startDate.setDate(startDate.getDate() - days);
 
     const readingsRef = getCollection("readings");
+    // Simple query - only filter by patientId (no composite index needed)
     const snapshot = await readingsRef
       .where("patientId", "==", patientId)
-      .where("timestamp", ">=", startDate.toISOString())
-      .orderBy("timestamp", "desc")
-      .limit(limit)
       .get();
 
-    const readings: BPReading[] = [];
+    let readings: BPReading[] = [];
     snapshot.forEach((doc) => {
       readings.push({ id: doc.id, ...doc.data() } as BPReading);
     });
+
+    // Filter by date and sort in memory
+    readings = readings
+      .filter(r => new Date(r.timestamp) >= startDate)
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      .slice(0, limit);
 
     const stats = calculateStats(readings);
 
