@@ -54,7 +54,7 @@ interface UIAlert {
 // Demo alert data with explicit status (fallback)
 const demoAlerts: UIAlert[] = [
   {
-    id: 1,
+    id: "1",
     status: "new",
     level: "critical",
     time: "2 hours ago",
@@ -69,7 +69,7 @@ const demoAlerts: UIAlert[] = [
     avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Maria"
   },
   {
-    id: 2,
+    id: "2",
     status: "new",
     level: "critical",
     time: "4 hours ago",
@@ -84,7 +84,7 @@ const demoAlerts: UIAlert[] = [
     avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Robert"
   },
   {
-    id: 3,
+    id: "3",
     status: "acknowledged",
     level: "moderate",
     time: "6 hours ago",
@@ -99,7 +99,7 @@ const demoAlerts: UIAlert[] = [
     acknowledgedAt: "5 hours ago"
   },
   {
-    id: 4,
+    id: "4",
     status: "new",
     level: "moderate",
     time: "8 hours ago",
@@ -113,7 +113,7 @@ const demoAlerts: UIAlert[] = [
     avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Linda"
   },
   {
-    id: 5,
+    id: "5",
     status: "new",
     level: "low",
     time: "12 hours ago",
