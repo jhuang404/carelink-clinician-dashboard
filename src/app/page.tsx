@@ -81,6 +81,12 @@ export default function Dashboard() {
       allReadings.forEach(({ patientId, readings }) => {
         readingsMap[patientId] = readings[0] || null;
       });
+      console.log('📊 Patient Readings Map:', readingsMap);
+      console.log('📋 Patients with lastContact:', data.patients.map((p: any) => ({ 
+        id: p.id, 
+        name: `${p.firstName} ${p.lastName}`, 
+        lastContact: p.lastContact 
+      })));
       setPatientReadings(readingsMap);
       
     } catch (err) {
@@ -93,10 +99,16 @@ export default function Dashboard() {
 
   // Convert PatientProfile to PatientSummary format for compatibility
   const patientSummaries: PatientSummary[] = useMemo(() => {
+    console.log('🔄 Computing patient summaries. Patients:', patients.length, 'Readings:', Object.keys(patientReadings).length);
     return patients.map(p => {
       const latestReading = patientReadings[p.id];
       const lastContactDate = p.lastContact ? new Date(p.lastContact) : null;
       const now = new Date();
+      
+      console.log(`👤 ${p.firstName} ${p.lastName}:`, {
+        lastContact: p.lastContact,
+        latestReading: latestReading ? `${latestReading.systolic}/${latestReading.diastolic}` : 'none'
+      });
       
       // Format last contact as relative time
       let lastContactStr = "No recent contact";
