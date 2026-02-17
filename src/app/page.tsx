@@ -46,9 +46,17 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch patients from API
+  // Fetch patients from API and set up auto-refresh
   useEffect(() => {
     fetchPatients();
+    
+    // Auto-refresh every 30 seconds
+    const refreshInterval = setInterval(() => {
+      console.log('🔄 Auto-refreshing patient data...');
+      fetchPatients();
+    }, 30000); // 30 seconds
+    
+    return () => clearInterval(refreshInterval);
   }, []);
 
   const fetchPatients = async () => {

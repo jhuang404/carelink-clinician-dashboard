@@ -3,7 +3,7 @@
 // Force dynamic rendering to avoid build-time errors
 export const dynamic = 'force-dynamic';
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -38,6 +38,26 @@ import type { Patient, TreatmentPlan } from "@/types";
  * 
  * Deep-dive view for individual patient review with real BP chart visualization.
  */
+
+// Helper functions
+const mapRiskLevelToPriority = (riskLevel: string): string => {
+  if (riskLevel === 'high') return 'Critical';
+  if (riskLevel === 'medium') return 'Moderate';
+  if (riskLevel === 'low') return 'Stable';
+  return 'Follow-up';
+};
+
+const formatRelativeTime = (isoString: string): string => {
+  const date = new Date(isoString);
+  const now = new Date();
+  const hoursDiff = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
+  
+  if (hoursDiff < 1) return "Just now";
+  if (hoursDiff < 24) return `${hoursDiff}h ago`;
+  const daysDiff = Math.floor(hoursDiff / 24);
+  if (daysDiff < 7) return `${daysDiff} day${daysDiff > 1 ? 's' : ''} ago`;
+  return date.toLocaleDateString();
+};
 
 // Mock BP chart data - 30 days of readings
 const generateBPData = (patientId: string) => {
@@ -124,16 +144,98 @@ export default function PatientDetails() {
   
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [timeRange, setTimeRange] = useState("30");
+  const [bpReadings, setBpReadings] = useState<any[]>([]);
+  const [patientData, setPatientData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
   
-  const patient = getPatientById(patientId);
-  const bpData = generateBPData(patientId);
+  // Fetch patient data and readings from API
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        
+        // Fetch patient profile
+        const patientRes = await fetch(`/api/patients/${patientId}`);
+        if (patientRes.ok) {
+          const patientJson = await patientRes.json();
+          setPatientData(patientJson);
+        }
+        
+        // Fetch BP readings
+        const days = timeRange === "7" ? 7 : timeRange === "90" ? 90 : 30;
+        const readingsRes = await fetch(`/api/readings?patientId=${patientId}&days=${days}&limit=100`);
+        if (readingsRes.ok) {
+          const readingsJson = await readingsRes.json();
+          setBpReadings(readingsJson.readings || []);
+          console.log('📊 Fetched readings:', readingsJson.readings?.length || 0);
+        }
+        
+      } catch (error) {
+        console.error('Error fetching patient data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchData();
+    
+    // Auto-refresh every 30 seconds
+    const refreshInterval = setInterval(() => {
+      console.log('🔄 Auto-refreshing patient data...');
+      fetchData();
+    }, 30000);
+    
+    return () => clearInterval(refreshInterval);
+  }, [patientId, timeRange]);
+  
+  // Convert API patient data to component format
+  let patient;
+  if (patientData) {
+    const latestReading = bpReadings[0];
+    patient = {
+      id: patientData.id,
+      name: `${patientData.firstName} ${patientData.lastName}`,
+      age: new Date().getFullYear() - new Date(patientData.dateOfBirth).getFullYear(),
+      gender: patientData.gender || "Unknown",
+      condition: patientData.diagnosis?.join(', ') || "Hypertension",
+      priority: mapRiskLevelToPriority(patientData.riskLevel),
+      bp: latestReading ? `${latestReading.systolic}/${latestReading.diastolic}` : "—/—",
+      bpTime: latestReading ? formatRelativeTime(latestReading.timestamp) : "No data",
+      trend: latestReading?.status === 'critical' || latestReading?.status === 'high' ? 'up' as const : 'stable' as const,
+      adherence: 85, // TODO: Calculate from medication logs
+      lastContact: patientData.lastContact ? formatRelativeTime(patientData.lastContact) : "No contact",
+      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${patientData.id}`,
+      riskLevel: patientData.riskLevel === 'high' ? 'High' : patientData.riskLevel === 'medium' ? 'Medium' : 'Low',
+      medications: patientData.medications?.map((med: any) => ({
+        name: med.name,
+        dose: med.dosage,
+        type: med.class || "Medication",
+        adherence: 85 // Placeholder
+      })) || [],
+      readings: bpReadings.slice(0, 10).map(r => ({
+        date: new Date(r.timestamp).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+        time: new Date(r.timestamp).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
+        systolic: r.systolic,
+        diastolic: r.diastolic,
+        status: r.status === 'critical' ? 'Critical' : r.status === 'high' ? 'High' : r.status === 'elevated' ? 'Elevated' : 'Normal'
+      }))
+    };
+  } else {
+    // Fallback to mock data
+    patient = getPatientById(patientId);
+  }
+  
+  // Convert real readings to chart format
+  const bpData = bpReadings.length > 0 
+    ? bpReadings.map(reading => ({
+        date: new Date(reading.timestamp).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+        systolic: reading.systolic,
+        diastolic: reading.diastolic,
+      })).reverse()
+    : generateBPData(patientId);
   
   // Filter data based on selected time range
-  const filteredData = timeRange === "7" 
-    ? bpData.slice(-7) 
-    : timeRange === "90" 
-      ? bpData // Would have 90 days in production
-      : bpData; // 30 days default
+  const filteredData = bpData;
 
   // Calculate averages
   const avgSystolic = Math.round(filteredData.reduce((sum, d) => sum + d.systolic, 0) / filteredData.length);

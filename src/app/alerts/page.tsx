@@ -133,9 +133,17 @@ export default function AlertManagement() {
   const [statusFilter, setStatusFilter] = useState<"new" | "acknowledged" | "resolved" | "all">("all");
   const [loading, setLoading] = useState(true);
   
-  // Fetch alerts from API
+  // Fetch alerts from API and set up auto-refresh
   useEffect(() => {
     fetchAlerts();
+    
+    // Auto-refresh every 30 seconds to show new alerts
+    const refreshInterval = setInterval(() => {
+      console.log('🔄 Auto-refreshing alerts...');
+      fetchAlerts();
+    }, 30000); // 30 seconds
+    
+    return () => clearInterval(refreshInterval);
   }, []);
   
   const fetchAlerts = async () => {
