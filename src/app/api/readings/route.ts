@@ -263,13 +263,31 @@ async function createAlertForReading(reading: BPReading) {
   try {
     const alertsRef = getCollection("alerts");
     
-    // Get patient name (simplified - in production would fetch from patients collection)
+    // Get patient name - try Firebase first, then fallback to demo data
     const patientsRef = getCollection("patients");
     const patientDoc = await patientsRef.doc(reading.patientId).get();
     const patientData = patientDoc.data();
-    const patientName = patientData 
-      ? `${patientData.firstName} ${patientData.lastName}`
-      : "Unknown Patient";
+    
+    let patientName = "Unknown Patient";
+    if (patientData) {
+      patientName = `${patientData.firstName} ${patientData.lastName}`;
+    } else {
+      // Fallback to demo patient data
+      const demoPatientMap: Record<string, string> = {
+        "P-2025-001": "Maria Rodriguez",
+        "P-2025-002": "Robert Thompson",
+        "P-2025-003": "James Wilson",
+        "P-2025-004": "Linda Martinez",
+        "P-2025-005": "David Kim",
+        "P-2025-006": "Sarah Johnson",
+        "P-2025-007": "William Brown",
+        "P-2025-008": "Michael Chen",
+        "P-2025-009": "Emily Davis",
+        "P-2025-010": "Thomas Anderson",
+        "P-2025-011": "Patricia Lee",
+      };
+      patientName = demoPatientMap[reading.patientId] || "Unknown Patient";
+    }
 
     const alertData = {
       patientId: reading.patientId,
