@@ -299,7 +299,7 @@ export default function AlertManagement() {
         <div className="flex gap-3">
           <select 
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as AlertStatus | "all")}
+            onChange={(e) => setStatusFilter(e.target.value as "new" | "acknowledged" | "resolved" | "all")}
             className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm focus:outline-none focus:border-magenta-500"
           >
             <option value="all">All Active ({stats.newCount + stats.acknowledgedCount})</option>
