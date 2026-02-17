@@ -172,7 +172,7 @@ function generateDemoAlerts(): Alert[] {
       id: "demo-alert-4",
       patientId: "P-2025-004",
       patientName: "Linda Martinez",
-      type: "medication-adjustment",
+      type: "follow-up-due",
       severity: "warning",
       status: "new",
       title: "Medication Adjustment Needed",
