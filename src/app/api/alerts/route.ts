@@ -24,10 +24,11 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get("status");
     const severity = searchParams.get("severity");
 
-    // If Firebase is not configured, return empty array
+    // If Firebase is not configured, return demo alerts
     if (!isAdminConfigured) {
-      console.log("[API] Firebase not configured, returning empty alerts");
-      return NextResponse.json({ alerts: [], total: 0 });
+      console.log("[API] Firebase not configured, returning demo alerts");
+      const demoAlerts = generateDemoAlerts();
+      return NextResponse.json({ alerts: demoAlerts, total: demoAlerts.length });
     }
 
     // Firebase is configured - fetch from Firestore
@@ -120,4 +121,77 @@ export async function PATCH(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+// Generate demo alerts for when Firebase is not configured
+function generateDemoAlerts(): Alert[] {
+  const now = new Date();
+  
+  return [
+    {
+      id: "demo-alert-1",
+      patientId: "P-2025-001",
+      patientName: "Maria Rodriguez",
+      type: "critical-bp",
+      severity: "critical",
+      status: "new",
+      title: "Severe Hypertension Alert",
+      description: "Patient's blood pressure has exceeded critical threshold. Last medication taken 3 days ago. Immediate intervention required.",
+      relatedReadingId: "reading-demo-1",
+      triggerValue: "185/110",
+      createdAt: new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString(), // 2 hours ago
+    },
+    {
+      id: "demo-alert-2",
+      patientId: "P-2025-002",
+      patientName: "Robert Thompson",
+      type: "critical-bp",
+      severity: "critical",
+      status: "new",
+      title: "Critical BP Reading",
+      description: "Elderly patient with comorbid CKD showing dangerously elevated BP. Risk of hypertensive crisis.",
+      relatedReadingId: "reading-demo-2",
+      triggerValue: "192/118",
+      createdAt: new Date(now.getTime() - 4 * 60 * 60 * 1000).toISOString(), // 4 hours ago
+    },
+    {
+      id: "demo-alert-3",
+      patientId: "P-2025-003",
+      patientName: "James Wilson",
+      type: "high-bp",
+      severity: "warning",
+      status: "acknowledged",
+      title: "Elevated BP Trend",
+      description: "Blood pressure showing consistent upward trend over past week. Patient reported stress from work.",
+      relatedReadingId: "reading-demo-3",
+      triggerValue: "165/95",
+      createdAt: new Date(now.getTime() - 6 * 60 * 60 * 1000).toISOString(), // 6 hours ago
+      acknowledgedAt: new Date(now.getTime() - 5 * 60 * 60 * 1000).toISOString(), // 5 hours ago
+    },
+    {
+      id: "demo-alert-4",
+      patientId: "P-2025-004",
+      patientName: "Linda Martinez",
+      type: "medication-adjustment",
+      severity: "warning",
+      status: "new",
+      title: "Medication Adjustment Needed",
+      description: "Recent medication change not showing expected results. Consider dose adjustment or alternative.",
+      relatedReadingId: "reading-demo-4",
+      triggerValue: "148/92",
+      createdAt: new Date(now.getTime() - 8 * 60 * 60 * 1000).toISOString(), // 8 hours ago
+    },
+    {
+      id: "demo-alert-5",
+      patientId: "P-2025-011",
+      patientName: "Patricia Lee",
+      type: "missed-reading",
+      severity: "info",
+      status: "new",
+      title: "Missed Reading Alert",
+      description: "Patient has not submitted BP readings for 5 days. Device connectivity issue reported.",
+      triggerValue: "—/—",
+      createdAt: new Date(now.getTime() - 12 * 60 * 60 * 1000).toISOString(), // 12 hours ago
+    },
+  ];
 }

@@ -184,7 +184,13 @@ export default function AlertManagement() {
         };
       });
       
-      setAlerts(uiAlerts);
+      // If no alerts from API, use demo data
+      if (uiAlerts.length === 0) {
+        console.log('No alerts from API, using demo data');
+        setAlerts(demoAlerts);
+      } else {
+        setAlerts(uiAlerts);
+      }
     } catch (err) {
       console.error('Error fetching alerts:', err);
       // Fallback to demo data on error
