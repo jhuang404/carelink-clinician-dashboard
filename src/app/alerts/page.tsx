@@ -115,6 +115,20 @@ const demoAlerts: UIAlert[] = [
   {
     id: "5",
     status: "new",
+    level: "moderate",
+    time: "10 hours ago",
+    title: "Elevated BP During Titration",
+    patient: "David Kim",
+    patientId: "P-2025-005",
+    location: "Rural Zone A",
+    bp: "152/94",
+    adherence: "85%",
+    desc: "New patient showing elevated BP during Amlodipine dose titration. Monitor response and consider adjustment.",
+    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=David"
+  },
+  {
+    id: "6",
+    status: "new",
     level: "low",
     time: "12 hours ago",
     title: "Missed Reading Alert",

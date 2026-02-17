@@ -183,6 +183,19 @@ function generateDemoAlerts(): Alert[] {
     },
     {
       id: "demo-alert-5",
+      patientId: "P-2025-005",
+      patientName: "David Kim",
+      type: "high-bp",
+      severity: "warning",
+      status: "new",
+      title: "Elevated BP During Titration",
+      description: "New patient showing elevated BP during Amlodipine dose titration. Monitor response and consider adjustment.",
+      relatedReadingId: "reading-demo-5",
+      triggerValue: "152/94",
+      createdAt: new Date(now.getTime() - 10 * 60 * 60 * 1000).toISOString(), // 10 hours ago
+    },
+    {
+      id: "demo-alert-6",
       patientId: "P-2025-011",
       patientName: "Patricia Lee",
       type: "missed-reading",
