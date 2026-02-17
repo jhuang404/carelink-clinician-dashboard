@@ -163,11 +163,18 @@ export default function AlertManagement() {
   const fetchAlerts = async () => {
     try {
       setLoading(true);
+      console.log('🔍 Fetching alerts from API...');
       const response = await fetch('/api/alerts');
       if (!response.ok) {
         throw new Error('Failed to fetch alerts');
       }
       const data = await response.json();
+      console.log('📥 API Response:', {
+        hasAlerts: !!data.alerts,
+        alertCount: data.alerts?.length || 0,
+        total: data.total,
+        alerts: data.alerts
+      });
       
       // Convert Firebase alerts to UI format
       const uiAlerts: UIAlert[] = data.alerts.map((alert: AlertType) => {

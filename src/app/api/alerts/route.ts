@@ -24,13 +24,17 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get("status");
     const severity = searchParams.get("severity");
 
+    console.log(`[API /alerts] Request received. Firebase configured: ${isAdminConfigured}`);
+
     // If Firebase is not configured, return empty array (let frontend handle demo data)
     if (!isAdminConfigured) {
-      console.log("[API] Firebase not configured, returning empty array");
+      console.log("[API /alerts] ⚠️  Firebase not configured - returning empty array");
+      console.log("[API /alerts] Set FIREBASE_ADMIN_PROJECT_ID, FIREBASE_ADMIN_CLIENT_EMAIL, FIREBASE_ADMIN_PRIVATE_KEY in .env.local");
       return NextResponse.json({ alerts: [], total: 0 });
     }
 
     // Firebase is configured - fetch from Firestore
+    console.log("[API /alerts] ✅ Firebase configured - fetching from Firestore...");
     const alertsRef = getCollection("alerts");
     // Simple query without orderBy to avoid index requirement
     const snapshot = await alertsRef.get();
@@ -38,10 +42,12 @@ export async function GET(request: NextRequest) {
     let alerts: Alert[] = [];
 
     snapshot.forEach((doc) => {
-      alerts.push({ id: doc.id, ...doc.data() } as Alert);
+      const data = doc.data();
+      alerts.push({ id: doc.id, ...data } as Alert);
+      console.log(`[API /alerts] Alert: ${doc.id} - ${data.patientName} (${data.patientId})`);
     });
 
-    console.log(`[API] Found ${alerts.length} alerts in Firebase`);
+    console.log(`[API /alerts] 📊 Found ${alerts.length} alerts in Firebase`);
 
     // Apply filters in memory
     if (status) {
