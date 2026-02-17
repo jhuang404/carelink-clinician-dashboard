@@ -24,11 +24,10 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get("status");
     const severity = searchParams.get("severity");
 
-    // If Firebase is not configured, return demo alerts
+    // If Firebase is not configured, return empty array (let frontend handle demo data)
     if (!isAdminConfigured) {
-      console.log("[API] Firebase not configured, returning demo alerts");
-      const demoAlerts = generateDemoAlerts();
-      return NextResponse.json({ alerts: demoAlerts, total: demoAlerts.length });
+      console.log("[API] Firebase not configured, returning empty array");
+      return NextResponse.json({ alerts: [], total: 0 });
     }
 
     // Firebase is configured - fetch from Firestore
@@ -41,6 +40,8 @@ export async function GET(request: NextRequest) {
     snapshot.forEach((doc) => {
       alerts.push({ id: doc.id, ...doc.data() } as Alert);
     });
+
+    console.log(`[API] Found ${alerts.length} alerts in Firebase`);
 
     // Apply filters in memory
     if (status) {
@@ -55,6 +56,8 @@ export async function GET(request: NextRequest) {
       new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
 
+    // ALWAYS return real data from Firebase, even if empty
+    // Frontend will decide whether to show demo data or not
     return NextResponse.json({ alerts, total: alerts.length });
 
   } catch (error) {

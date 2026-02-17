@@ -198,14 +198,16 @@ export default function AlertManagement() {
         };
       });
       
-      // Merge real alerts with demo alerts
-      // Real alerts (from Firebase) take precedence
-      const realAlertPatientIds = new Set(uiAlerts.map(a => a.patientId));
-      const demoAlertsFiltered = demoAlerts.filter(a => !realAlertPatientIds.has(a.patientId));
-      const mergedAlerts = [...uiAlerts, ...demoAlertsFiltered];
-      
-      console.log(`📋 Merged alerts: ${uiAlerts.length} real + ${demoAlertsFiltered.length} demo = ${mergedAlerts.length} total`);
-      setAlerts(mergedAlerts);
+      // Always prioritize real data over demo data
+      // If there's any real data from Firebase, ONLY show real data (even if incomplete)
+      // Only use demo data as complete fallback when Firebase has NO data at all
+      if (data.alerts && data.alerts.length > 0) {
+        console.log(`📋 Using Firebase data: ${uiAlerts.length} real alerts`);
+        setAlerts(uiAlerts);
+      } else {
+        console.log(`📋 No Firebase data, using demo alerts: ${demoAlerts.length} demo alerts`);
+        setAlerts(demoAlerts);
+      }
     } catch (err) {
       console.error('Error fetching alerts:', err);
       // Fallback to demo data on error
