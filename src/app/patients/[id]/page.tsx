@@ -40,7 +40,7 @@ import type { Patient, TreatmentPlan } from "@/types";
  */
 
 // Helper functions
-const mapRiskLevelToPriority = (riskLevel: string): string => {
+const mapRiskLevelToPriority = (riskLevel: string): "Critical" | "Moderate" | "Stable" | "Follow-up" => {
   if (riskLevel === 'high') return 'Critical';
   if (riskLevel === 'medium') return 'Moderate';
   if (riskLevel === 'low') return 'Stable';
