@@ -510,7 +510,7 @@ export default function PatientDetails() {
               </button>
             </div>
             <div className="space-y-4">
-              {patient.medications.map((med, index) => (
+              {patient.medications.map((med: { name: string; dose: string; type: string; adherence: number }, index: number) => (
                 <div key={index} className="rounded-xl border border-gray-100 p-4">
                   <div className="flex items-center justify-between mb-2">
                     <p className="font-bold text-gray-900">{med.name} {med.dose}</p>
