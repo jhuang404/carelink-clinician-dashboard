@@ -70,31 +70,34 @@ export default function Dashboard() {
       const data = await response.json();
       setPatients(data.patients || []);
       
-      // Fetch latest readings for each patient
+      // Fetch today's readings for each patient to calculate daily average
       const readingsPromises = data.patients.map(async (patient: PatientProfile) => {
         try {
-          const readingsRes = await fetch(`/api/readings?patientId=${patient.id}&limit=1`);
+          const readingsRes = await fetch(`/api/readings?patientId=${patient.id}&days=1&limit=10`);
           if (readingsRes.ok) {
             const readingsData = await readingsRes.json();
-            return { patientId: patient.id, readings: readingsData.readings };
+            return { 
+              patientId: patient.id, 
+              readings: readingsData.readings,
+              dailyAverages: readingsData.dailyAverages,
+            };
           }
         } catch (err) {
           console.error(`Failed to fetch readings for ${patient.id}:`, err);
         }
-        return { patientId: patient.id, readings: [] };
+        return { patientId: patient.id, readings: [], dailyAverages: [] };
       });
       
       const allReadings = await Promise.all(readingsPromises);
       const readingsMap: Record<string, any> = {};
-      allReadings.forEach(({ patientId, readings }) => {
-        readingsMap[patientId] = readings[0] || null;
+      allReadings.forEach(({ patientId, readings, dailyAverages }) => {
+        const todayAvg = dailyAverages?.[0] || null;
+        readingsMap[patientId] = {
+          latest: readings[0] || null,
+          todayAvg,
+          todayCount: todayAvg?.readingCount || 0,
+        };
       });
-      console.log('📊 Patient Readings Map:', readingsMap);
-      console.log('📋 Patients with lastContact:', data.patients.map((p: any) => ({ 
-        id: p.id, 
-        name: `${p.firstName} ${p.lastName}`, 
-        lastContact: p.lastContact 
-      })));
       setPatientReadings(readingsMap);
       
     } catch (err) {
@@ -107,16 +110,13 @@ export default function Dashboard() {
 
   // Convert PatientProfile to PatientSummary format for compatibility
   const patientSummaries: PatientSummary[] = useMemo(() => {
-    console.log('🔄 Computing patient summaries. Patients:', patients.length, 'Readings:', Object.keys(patientReadings).length);
     return patients.map(p => {
-      const latestReading = patientReadings[p.id];
+      const readingData = patientReadings[p.id];
+      const latestReading = readingData?.latest;
+      const todayAvg = readingData?.todayAvg;
+      const todayCount = readingData?.todayCount || 0;
       const lastContactDate = p.lastContact ? new Date(p.lastContact) : null;
       const now = new Date();
-      
-      console.log(`👤 ${p.firstName} ${p.lastName}:`, {
-        lastContact: p.lastContact,
-        latestReading: latestReading ? `${latestReading.systolic}/${latestReading.diastolic}` : 'none'
-      });
       
       // Format last contact as relative time
       let lastContactStr = "No recent contact";
@@ -129,10 +129,13 @@ export default function Dashboard() {
         else lastContactStr = `${Math.floor(daysDiff / 30)} months ago`;
       }
       
-      // Format BP reading
+      // Use today's daily average if available, otherwise latest reading
       let bpStr = "—/—";
       let bpTimeStr = "No recent data";
-      if (latestReading) {
+      if (todayAvg) {
+        bpStr = `${todayAvg.avgSystolic}/${todayAvg.avgDiastolic}`;
+        bpTimeStr = `Today avg (${todayCount} readings)`;
+      } else if (latestReading) {
         bpStr = `${latestReading.systolic}/${latestReading.diastolic}`;
         const readingDate = new Date(latestReading.timestamp);
         const hoursDiff = Math.floor((now.getTime() - readingDate.getTime()) / (1000 * 60 * 60));
@@ -140,6 +143,8 @@ export default function Dashboard() {
         else if (hoursDiff < 24) bpTimeStr = `${hoursDiff}h ago`;
         else bpTimeStr = `${Math.floor(hoursDiff / 24)}d ago`;
       }
+
+      const avgStatus = todayAvg?.status;
       
       return {
         id: p.id,
@@ -149,8 +154,8 @@ export default function Dashboard() {
         condition: p.diagnosis.join(', '),
         bp: bpStr,
         bpTime: bpTimeStr,
-        trend: latestReading?.status === 'critical' || latestReading?.status === 'high' ? 'up' as const : 'stable' as const,
-        adherence: 85, // TODO: Calculate from readings
+        trend: (avgStatus === 'critical' || avgStatus === 'high' || latestReading?.status === 'critical' || latestReading?.status === 'high') ? 'up' as const : 'stable' as const,
+        adherence: 85,
         lastContact: lastContactStr,
         avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${p.id}`,
         missedReadings: 0,
@@ -410,7 +415,7 @@ export default function Dashboard() {
                 <th className="px-6 py-4"><input type="checkbox" className="rounded border-gray-300" /></th>
                 <th className="px-6 py-4">Priority</th>
                 <th className="px-6 py-4">Patient</th>
-                <th className="px-6 py-4">Latest BP</th>
+                <th className="px-6 py-4">Today&apos;s Avg BP</th>
                 <th className="px-6 py-4">Trend</th>
                 <th className="px-6 py-4">Adherence</th>
                 <th className="px-6 py-4">Last Contact</th>

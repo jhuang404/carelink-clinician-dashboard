@@ -153,6 +153,21 @@ export interface Alert {
   resolution?: string;
 }
 
+// ============ DAILY BP AVERAGES ============
+
+export interface DailyBPAverage {
+  date: string; // YYYY-MM-DD
+  avgSystolic: number;
+  avgDiastolic: number;
+  avgPulse?: number;
+  minSystolic: number;
+  maxSystolic: number;
+  minDiastolic: number;
+  maxDiastolic: number;
+  readingCount: number;
+  status: ReadingStatus; // based on avg values
+}
+
 // ============ API REQUEST/RESPONSE TYPES ============
 
 // Patients
@@ -176,11 +191,13 @@ export interface GetReadingsParams {
 
 export interface GetReadingsResponse {
   readings: BPReading[];
+  dailyAverages: DailyBPAverage[];
   stats: {
     avgSystolic: number;
     avgDiastolic: number;
     totalReadings: number;
     criticalCount: number;
+    readingsPerDay: number;
   };
 }
 

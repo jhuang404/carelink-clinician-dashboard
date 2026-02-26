@@ -14,6 +14,7 @@ import type {
   BPReading, 
   CreateReadingRequest, 
   GetReadingsResponse,
+  DailyBPAverage,
   calculateReadingStatus 
 } from "@/types/api";
 
@@ -43,9 +44,11 @@ export async function GET(request: NextRequest) {
     if (!isAdminConfigured) {
       const mockReadings = generateMockReadings(patientId, days, limit);
       const stats = calculateStats(mockReadings);
+      const dailyAverages = calculateDailyAverages(mockReadings);
 
       const response: GetReadingsResponse = {
         readings: mockReadings,
+        dailyAverages,
         stats,
       };
 
@@ -57,7 +60,6 @@ export async function GET(request: NextRequest) {
     startDate.setDate(startDate.getDate() - days);
 
     const readingsRef = getCollection("readings");
-    // Simple query - only filter by patientId (no composite index needed)
     const snapshot = await readingsRef
       .where("patientId", "==", patientId)
       .get();
@@ -74,9 +76,11 @@ export async function GET(request: NextRequest) {
       .slice(0, limit);
 
     const stats = calculateStats(readings);
+    const dailyAverages = calculateDailyAverages(readings);
 
     const response: GetReadingsResponse = {
       readings,
+      dailyAverages,
       stats,
     };
 
@@ -205,6 +209,7 @@ function calculateStats(readings: BPReading[]): GetReadingsResponse["stats"] {
       avgDiastolic: 0,
       totalReadings: 0,
       criticalCount: 0,
+      readingsPerDay: 0,
     };
   }
 
@@ -212,49 +217,89 @@ function calculateStats(readings: BPReading[]): GetReadingsResponse["stats"] {
   const totalDiastolic = readings.reduce((sum, r) => sum + r.diastolic, 0);
   const criticalCount = readings.filter(r => r.status === "critical" || r.status === "high").length;
 
+  const uniqueDays = new Set(readings.map(r => r.timestamp.slice(0, 10))).size;
+  const readingsPerDay = uniqueDays > 0 ? Math.round((readings.length / uniqueDays) * 10) / 10 : 0;
+
   return {
     avgSystolic: Math.round(totalSystolic / readings.length),
     avgDiastolic: Math.round(totalDiastolic / readings.length),
     totalReadings: readings.length,
     criticalCount,
+    readingsPerDay,
   };
+}
+
+function calculateDailyAverages(readings: BPReading[]): DailyBPAverage[] {
+  const grouped: Record<string, BPReading[]> = {};
+
+  for (const r of readings) {
+    const dateKey = r.timestamp.slice(0, 10); // YYYY-MM-DD
+    if (!grouped[dateKey]) grouped[dateKey] = [];
+    grouped[dateKey].push(r);
+  }
+
+  return Object.entries(grouped)
+    .map(([date, dayReadings]) => {
+      const systolics = dayReadings.map(r => r.systolic);
+      const diastolics = dayReadings.map(r => r.diastolic);
+      const pulses = dayReadings.filter(r => r.pulse != null).map(r => r.pulse!);
+
+      const avgSys = Math.round(systolics.reduce((a, b) => a + b, 0) / systolics.length);
+      const avgDia = Math.round(diastolics.reduce((a, b) => a + b, 0) / diastolics.length);
+
+      return {
+        date,
+        avgSystolic: avgSys,
+        avgDiastolic: avgDia,
+        avgPulse: pulses.length > 0 ? Math.round(pulses.reduce((a, b) => a + b, 0) / pulses.length) : undefined,
+        minSystolic: Math.min(...systolics),
+        maxSystolic: Math.max(...systolics),
+        minDiastolic: Math.min(...diastolics),
+        maxDiastolic: Math.max(...diastolics),
+        readingCount: dayReadings.length,
+        status: getReadingStatus(avgSys, avgDia),
+      };
+    })
+    .sort((a, b) => b.date.localeCompare(a.date));
 }
 
 function generateMockReadings(patientId: string, days: number, limit: number): BPReading[] {
   const readings: BPReading[] = [];
   const now = new Date();
-  
+  const readingTimes = [7, 10, 13, 17, 21]; // 5 readings per day
+
   for (let d = 0; d < days && readings.length < limit; d++) {
-    const readingsPerDay = Math.floor(Math.random() * 2) + 1;
-    
-    for (let r = 0; r < readingsPerDay && readings.length < limit; r++) {
+    const dayVariance = Math.sin(d * 0.3) * 8;
+
+    for (let r = 0; r < readingTimes.length && readings.length < limit; r++) {
       const date = new Date(now);
       date.setDate(date.getDate() - d);
-      date.setHours(8 + (r * 8) + Math.floor(Math.random() * 4));
+      date.setHours(readingTimes[r] + Math.floor(Math.random() * 2));
       date.setMinutes(Math.floor(Math.random() * 60));
-      
-      const baseSystolic = 125 + Math.floor(Math.random() * 35);
-      const baseDiastolic = 75 + Math.floor(Math.random() * 20);
-      
-      const systolic = baseSystolic + Math.floor(Math.random() * 15) - 7;
-      const diastolic = baseDiastolic + Math.floor(Math.random() * 10) - 5;
-      
+      date.setSeconds(Math.floor(Math.random() * 60));
+
+      const baseSystolic = 130 + Math.floor(Math.random() * 30);
+      const baseDiastolic = 78 + Math.floor(Math.random() * 18);
+
+      const systolic = Math.round(baseSystolic + dayVariance + (Math.random() - 0.5) * 12);
+      const diastolic = Math.round(baseDiastolic + dayVariance * 0.6 + (Math.random() - 0.5) * 8);
+
       const status = getReadingStatus(systolic, diastolic);
-      
+
       readings.push({
         id: `mock-reading-${patientId}-${d}-${r}`,
         patientId,
         systolic,
         diastolic,
-        pulse: 60 + Math.floor(Math.random() * 30),
+        pulse: 62 + Math.floor(Math.random() * 25),
         timestamp: date.toISOString(),
         source: "patient-app",
         status,
       });
     }
   }
-  
-  return readings.sort((a, b) => 
+
+  return readings.sort((a, b) =>
     new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
   );
 }

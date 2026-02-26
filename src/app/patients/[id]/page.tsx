@@ -28,6 +28,8 @@ import {
   Tooltip,
   ResponsiveContainer,
   ReferenceLine,
+  Area,
+  ComposedChart,
 } from "recharts";
 import { cn } from "@/lib/utils";
 import { TreatmentPlanDrawer } from "@/components/drawers/TreatmentPlanDrawer";
@@ -119,7 +121,6 @@ const getPatientById = (id: string): Patient & {
   ],
 });
 
-// Custom tooltip for the chart
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     return (
@@ -137,6 +138,45 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   return null;
 };
 
+const DailyAvgTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    const data = payload[0]?.payload;
+    return (
+      <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-3 min-w-[180px]">
+        <p className="text-xs font-medium text-gray-500 mb-2">{label}</p>
+        <div className="space-y-1.5">
+          <div>
+            <p className="text-sm font-bold text-magenta-600">
+              Avg Systolic: {data?.avgSystolic} mmHg
+            </p>
+            {data?.minSystolic != null && (
+              <p className="text-[11px] text-gray-400">
+                Range: {data.minSystolic} – {data.maxSystolic}
+              </p>
+            )}
+          </div>
+          <div>
+            <p className="text-sm font-bold text-blue-500">
+              Avg Diastolic: {data?.avgDiastolic} mmHg
+            </p>
+            {data?.minDiastolic != null && (
+              <p className="text-[11px] text-gray-400">
+                Range: {data.minDiastolic} – {data.maxDiastolic}
+              </p>
+            )}
+          </div>
+          {data?.readingCount && (
+            <p className="text-[11px] text-gray-400 pt-1 border-t">
+              {data.readingCount} readings
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
+
 export default function PatientDetails() {
   const params = useParams();
   const router = useRouter();
@@ -144,7 +184,10 @@ export default function PatientDetails() {
   
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [timeRange, setTimeRange] = useState("30");
+  const [chartView, setChartView] = useState<"daily-avg" | "individual">("daily-avg");
   const [bpReadings, setBpReadings] = useState<any[]>([]);
+  const [dailyAverages, setDailyAverages] = useState<any[]>([]);
+  const [readingsStats, setReadingsStats] = useState<any>(null);
   const [patientData, setPatientData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   
@@ -161,13 +204,14 @@ export default function PatientDetails() {
           setPatientData(patientJson);
         }
         
-        // Fetch BP readings
+        // Fetch BP readings (increased limit for 5 readings/day)
         const days = timeRange === "7" ? 7 : timeRange === "90" ? 90 : 30;
-        const readingsRes = await fetch(`/api/readings?patientId=${patientId}&days=${days}&limit=100`);
+        const readingsRes = await fetch(`/api/readings?patientId=${patientId}&days=${days}&limit=500`);
         if (readingsRes.ok) {
           const readingsJson = await readingsRes.json();
           setBpReadings(readingsJson.readings || []);
-          console.log('📊 Fetched readings:', readingsJson.readings?.length || 0);
+          setDailyAverages(readingsJson.dailyAverages || []);
+          setReadingsStats(readingsJson.stats || null);
         }
         
       } catch (error) {
@@ -179,9 +223,7 @@ export default function PatientDetails() {
     
     fetchData();
     
-    // Auto-refresh every 30 seconds
     const refreshInterval = setInterval(() => {
-      console.log('🔄 Auto-refreshing patient data...');
       fetchData();
     }, 30000);
     
@@ -225,21 +267,42 @@ export default function PatientDetails() {
     patient = getPatientById(patientId);
   }
   
-  // Convert real readings to chart format
-  const bpData = bpReadings.length > 0 
+  // Daily averages chart data (primary view)
+  const dailyAvgChartData = dailyAverages.length > 0
+    ? [...dailyAverages].reverse().map(da => ({
+        date: new Date(da.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+        avgSystolic: da.avgSystolic,
+        avgDiastolic: da.avgDiastolic,
+        minSystolic: da.minSystolic,
+        maxSystolic: da.maxSystolic,
+        minDiastolic: da.minDiastolic,
+        maxDiastolic: da.maxDiastolic,
+        readingCount: da.readingCount,
+      }))
+    : [];
+
+  // Individual readings chart data (secondary view)
+  const individualChartData = bpReadings.length > 0 
     ? bpReadings.map(reading => ({
-        date: new Date(reading.timestamp).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+        date: new Date(reading.timestamp).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }),
         systolic: reading.systolic,
         diastolic: reading.diastolic,
       })).reverse()
     : generateBPData(patientId);
-  
-  // Filter data based on selected time range
-  const filteredData = bpData;
 
-  // Calculate averages
-  const avgSystolic = Math.round(filteredData.reduce((sum, d) => sum + d.systolic, 0) / filteredData.length);
-  const avgDiastolic = Math.round(filteredData.reduce((sum, d) => sum + d.diastolic, 0) / filteredData.length);
+  // Use daily averages for the main chart and overall stats
+  const filteredData = dailyAvgChartData.length > 0 ? dailyAvgChartData : individualChartData;
+
+  const avgSystolic = readingsStats?.avgSystolic || 
+    (dailyAvgChartData.length > 0
+      ? Math.round(dailyAvgChartData.reduce((sum, d) => sum + d.avgSystolic, 0) / dailyAvgChartData.length)
+      : Math.round(individualChartData.reduce((sum, d) => sum + d.systolic, 0) / individualChartData.length));
+  const avgDiastolic = readingsStats?.avgDiastolic || 
+    (dailyAvgChartData.length > 0
+      ? Math.round(dailyAvgChartData.reduce((sum, d) => sum + d.avgDiastolic, 0) / dailyAvgChartData.length)
+      : Math.round(individualChartData.reduce((sum, d) => sum + d.diastolic, 0) / individualChartData.length));
+  const totalReadings = readingsStats?.totalReadings || bpReadings.length;
+  const readingsPerDay = readingsStats?.readingsPerDay || 0;
 
   const handleSavePlan = async (plan: TreatmentPlan) => {
     console.log("Saving treatment plan from details page:", plan);
@@ -355,11 +418,40 @@ export default function PatientDetails() {
       <div className="grid grid-cols-3 gap-6">
         {/* Main Content */}
         <div className="col-span-2 space-y-6">
-          {/* BP History Chart - REAL CHART */}
+          {/* BP History Chart */}
           <div className="card">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="font-bold text-gray-900">Blood Pressure History</h3>
+              <div>
+                <h3 className="font-bold text-gray-900">Blood Pressure History</h3>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {chartView === "daily-avg" ? "Daily averages from multiple readings per day" : "All individual readings"}
+                </p>
+              </div>
               <div className="flex items-center gap-2">
+                <div className="flex rounded-lg border border-gray-200 bg-gray-50 p-0.5">
+                  <button
+                    onClick={() => setChartView("daily-avg")}
+                    className={cn(
+                      "rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+                      chartView === "daily-avg"
+                        ? "bg-white text-gray-900 shadow-sm"
+                        : "text-gray-500 hover:text-gray-700"
+                    )}
+                  >
+                    Daily Avg
+                  </button>
+                  <button
+                    onClick={() => setChartView("individual")}
+                    className={cn(
+                      "rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+                      chartView === "individual"
+                        ? "bg-white text-gray-900 shadow-sm"
+                        : "text-gray-500 hover:text-gray-700"
+                    )}
+                  >
+                    Individual
+                  </button>
+                </div>
                 <select 
                   value={timeRange}
                   onChange={(e) => setTimeRange(e.target.value)}
@@ -375,47 +467,114 @@ export default function PatientDetails() {
               </div>
             </div>
             
-            {/* Real Chart using Recharts */}
-            <div className="h-64">
+            {/* Chart */}
+            <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={filteredData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis 
-                    dataKey="date" 
-                    tick={{ fontSize: 11, fill: '#9ca3af' }}
-                    tickLine={false}
-                    axisLine={{ stroke: '#e5e7eb' }}
-                  />
-                  <YAxis 
-                    domain={[50, 200]}
-                    tick={{ fontSize: 11, fill: '#9ca3af' }}
-                    tickLine={false}
-                    axisLine={{ stroke: '#e5e7eb' }}
-                    tickFormatter={(value) => `${value}`}
-                  />
-                  <Tooltip content={<CustomTooltip />} />
-                  {/* Target range reference lines */}
-                  <ReferenceLine y={140} stroke="#f97316" strokeDasharray="5 5" label={{ value: "High", fontSize: 10, fill: "#f97316" }} />
-                  <ReferenceLine y={90} stroke="#3b82f6" strokeDasharray="5 5" label={{ value: "Normal", fontSize: 10, fill: "#3b82f6" }} />
-                  {/* Systolic line (magenta) */}
-                  <Line 
-                    type="monotone" 
-                    dataKey="systolic" 
-                    stroke="#E20074" 
-                    strokeWidth={2}
-                    dot={{ fill: '#E20074', strokeWidth: 0, r: 3 }}
-                    activeDot={{ r: 5, fill: '#E20074' }}
-                  />
-                  {/* Diastolic line (blue) */}
-                  <Line 
-                    type="monotone" 
-                    dataKey="diastolic" 
-                    stroke="#3b82f6" 
-                    strokeWidth={2}
-                    dot={{ fill: '#3b82f6', strokeWidth: 0, r: 3 }}
-                    activeDot={{ r: 5, fill: '#3b82f6' }}
-                  />
-                </LineChart>
+                {chartView === "daily-avg" && dailyAvgChartData.length > 0 ? (
+                  <ComposedChart data={dailyAvgChartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis
+                      dataKey="date"
+                      tick={{ fontSize: 11, fill: '#9ca3af' }}
+                      tickLine={false}
+                      axisLine={{ stroke: '#e5e7eb' }}
+                    />
+                    <YAxis
+                      domain={[50, 200]}
+                      tick={{ fontSize: 11, fill: '#9ca3af' }}
+                      tickLine={false}
+                      axisLine={{ stroke: '#e5e7eb' }}
+                    />
+                    <Tooltip content={<DailyAvgTooltip />} />
+                    <ReferenceLine y={140} stroke="#f97316" strokeDasharray="5 5" label={{ value: "High", fontSize: 10, fill: "#f97316" }} />
+                    <ReferenceLine y={90} stroke="#3b82f6" strokeDasharray="5 5" label={{ value: "Normal", fontSize: 10, fill: "#3b82f6" }} />
+                    {/* Systolic range band */}
+                    <Area
+                      type="monotone"
+                      dataKey="minSystolic"
+                      stackId="sysRange"
+                      stroke="none"
+                      fill="transparent"
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey={(d: any) => d.maxSystolic - d.minSystolic}
+                      stackId="sysRange"
+                      stroke="none"
+                      fill="#E20074"
+                      fillOpacity={0.08}
+                    />
+                    {/* Diastolic range band */}
+                    <Area
+                      type="monotone"
+                      dataKey="minDiastolic"
+                      stackId="diaRange"
+                      stroke="none"
+                      fill="transparent"
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey={(d: any) => d.maxDiastolic - d.minDiastolic}
+                      stackId="diaRange"
+                      stroke="none"
+                      fill="#3b82f6"
+                      fillOpacity={0.08}
+                    />
+                    {/* Avg systolic line */}
+                    <Line
+                      type="monotone"
+                      dataKey="avgSystolic"
+                      stroke="#E20074"
+                      strokeWidth={2.5}
+                      dot={{ fill: '#E20074', strokeWidth: 0, r: 4 }}
+                      activeDot={{ r: 6, fill: '#E20074' }}
+                    />
+                    {/* Avg diastolic line */}
+                    <Line
+                      type="monotone"
+                      dataKey="avgDiastolic"
+                      stroke="#3b82f6"
+                      strokeWidth={2.5}
+                      dot={{ fill: '#3b82f6', strokeWidth: 0, r: 4 }}
+                      activeDot={{ r: 6, fill: '#3b82f6' }}
+                    />
+                  </ComposedChart>
+                ) : (
+                  <LineChart data={individualChartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis 
+                      dataKey="date" 
+                      tick={{ fontSize: 11, fill: '#9ca3af' }}
+                      tickLine={false}
+                      axisLine={{ stroke: '#e5e7eb' }}
+                    />
+                    <YAxis 
+                      domain={[50, 200]}
+                      tick={{ fontSize: 11, fill: '#9ca3af' }}
+                      tickLine={false}
+                      axisLine={{ stroke: '#e5e7eb' }}
+                    />
+                    <Tooltip content={<CustomTooltip />} />
+                    <ReferenceLine y={140} stroke="#f97316" strokeDasharray="5 5" label={{ value: "High", fontSize: 10, fill: "#f97316" }} />
+                    <ReferenceLine y={90} stroke="#3b82f6" strokeDasharray="5 5" label={{ value: "Normal", fontSize: 10, fill: "#3b82f6" }} />
+                    <Line 
+                      type="monotone" 
+                      dataKey="systolic" 
+                      stroke="#E20074" 
+                      strokeWidth={2}
+                      dot={{ fill: '#E20074', strokeWidth: 0, r: 2 }}
+                      activeDot={{ r: 4, fill: '#E20074' }}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="diastolic" 
+                      stroke="#3b82f6" 
+                      strokeWidth={2}
+                      dot={{ fill: '#3b82f6', strokeWidth: 0, r: 2 }}
+                      activeDot={{ r: 4, fill: '#3b82f6' }}
+                    />
+                  </LineChart>
+                )}
               </ResponsiveContainer>
             </div>
 
@@ -423,35 +582,114 @@ export default function PatientDetails() {
             <div className="flex items-center justify-center gap-6 mt-4 pt-4 border-t">
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full bg-magenta-600" />
-                <span className="text-xs text-gray-600">Systolic</span>
+                <span className="text-xs text-gray-600">{chartView === "daily-avg" ? "Avg Systolic" : "Systolic"}</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full bg-blue-500" />
-                <span className="text-xs text-gray-600">Diastolic</span>
+                <span className="text-xs text-gray-600">{chartView === "daily-avg" ? "Avg Diastolic" : "Diastolic"}</span>
               </div>
+              {chartView === "daily-avg" && (
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded bg-gray-200" />
+                  <span className="text-xs text-gray-600">Daily Range</span>
+                </div>
+              )}
             </div>
 
             {/* Summary stats */}
-            <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t">
+            <div className="grid grid-cols-4 gap-4 mt-6 pt-6 border-t">
               <div className="text-center">
-                <p className="text-3xl font-bold text-gray-900">{avgSystolic}</p>
-                <p className="text-xs text-gray-500">Avg Systolic</p>
+                <p className="text-3xl font-bold text-gray-900">{avgSystolic}/{avgDiastolic}</p>
+                <p className="text-xs text-gray-500">Overall Average</p>
               </div>
               <div className="text-center">
-                <p className="text-3xl font-bold text-gray-900">{avgDiastolic}</p>
-                <p className="text-xs text-gray-500">Avg Diastolic</p>
+                <p className="text-3xl font-bold text-gray-900">{totalReadings}</p>
+                <p className="text-xs text-gray-500">Total Readings</p>
               </div>
               <div className="text-center">
-                <p className="text-3xl font-bold text-gray-900">{filteredData.length}</p>
-                <p className="text-xs text-gray-500">Readings</p>
+                <p className="text-3xl font-bold text-gray-900">{dailyAverages.length}</p>
+                <p className="text-xs text-gray-500">Days Tracked</p>
+              </div>
+              <div className="text-center">
+                <p className="text-3xl font-bold text-gray-900">{readingsPerDay}</p>
+                <p className="text-xs text-gray-500">Avg Readings/Day</p>
               </div>
             </div>
           </div>
 
-          {/* Recent Readings Table */}
+          {/* Daily Averages Table */}
+          {dailyAverages.length > 0 && (
+            <div className="card p-0">
+              <div className="p-6 border-b flex items-center justify-between">
+                <div>
+                  <h3 className="font-bold text-gray-900">Daily BP Averages</h3>
+                  <p className="text-xs text-gray-400 mt-0.5">Averaged from multiple daily readings per patient</p>
+                </div>
+              </div>
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-gray-50 text-xs font-bold text-gray-500 uppercase">
+                    <th className="px-6 py-3 text-left">Date</th>
+                    <th className="px-6 py-3 text-left">Avg BP</th>
+                    <th className="px-6 py-3 text-left">Systolic Range</th>
+                    <th className="px-6 py-3 text-left">Diastolic Range</th>
+                    <th className="px-6 py-3 text-center">Readings</th>
+                    <th className="px-6 py-3 text-left">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {dailyAverages.slice(0, 14).map((da: any, index: number) => {
+                    const statusLabel = da.status === 'critical' ? 'Critical' : da.status === 'high' ? 'High' : da.status === 'elevated' ? 'Elevated' : 'Normal';
+                    return (
+                      <tr key={index} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 text-sm text-gray-900">
+                          {new Date(da.date + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                        </td>
+                        <td className={cn(
+                          "px-6 py-4 text-sm font-bold",
+                          da.avgSystolic >= 180 ? "text-red-600" :
+                          da.avgSystolic >= 140 ? "text-orange-600" : "text-gray-900"
+                        )}>
+                          {da.avgSystolic}/{da.avgDiastolic}
+                        </td>
+                        <td className="px-6 py-4 text-xs text-gray-500">
+                          {da.minSystolic} – {da.maxSystolic}
+                        </td>
+                        <td className="px-6 py-4 text-xs text-gray-500">
+                          {da.minDiastolic} – {da.maxDiastolic}
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <span className={cn(
+                            "inline-flex items-center justify-center rounded-full px-2 py-0.5 text-xs font-medium",
+                            da.readingCount >= 5 ? "bg-green-50 text-green-700" :
+                            da.readingCount >= 3 ? "bg-yellow-50 text-yellow-700" : "bg-red-50 text-red-700"
+                          )}>
+                            {da.readingCount}/5
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={cn(
+                            "rounded-full px-2 py-0.5 text-xs font-medium",
+                            statusLabel === "Critical" && "bg-red-100 text-red-700",
+                            statusLabel === "High" && "bg-orange-100 text-orange-700",
+                            statusLabel === "Elevated" && "bg-yellow-100 text-yellow-700",
+                            statusLabel === "Normal" && "bg-green-100 text-green-700"
+                          )}>
+                            {statusLabel}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Individual Readings Table */}
           <div className="card p-0">
             <div className="p-6 border-b">
-              <h3 className="font-bold text-gray-900">Recent Readings</h3>
+              <h3 className="font-bold text-gray-900">Recent Individual Readings</h3>
             </div>
             <table className="w-full">
               <thead>
