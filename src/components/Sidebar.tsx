@@ -6,7 +6,6 @@ import {
   LayoutDashboard, 
   Bell, 
   MessageSquare, 
-  BarChart3, 
   Activity
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -15,7 +14,6 @@ const menuItems = [
   { name: "Patient Overview", icon: LayoutDashboard, href: "/" },
   { name: "Alert Management", icon: Bell, href: "/alerts" },
   { name: "Messages", icon: MessageSquare, href: "/messages" },
-  { name: "Analytics", icon: BarChart3, href: "/analytics" },
 ];
 
 export default function Sidebar() {
