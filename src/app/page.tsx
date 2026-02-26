@@ -502,7 +502,7 @@ export default function Dashboard() {
                         patient.priority === "Moderate" ? "text-orange-600" : "text-gray-900"
                       )}>
                         {patient.bp}
-                        {patient.missedReadings && patient.missedReadings > 0 && (
+                        {patient.missedReadings != null && patient.missedReadings > 0 && (
                           <span className="ml-1 text-xs text-amber-600" title={`${patient.missedReadings} missed readings`}>
                             ⚠
                           </span>
