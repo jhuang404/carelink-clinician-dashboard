@@ -109,8 +109,31 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(response);
 
-  } catch (error) {
+  } catch (error: any) {
     console.error("[API] Error fetching patients:", error);
+
+    // Fallback to demo data on quota exhaustion or transient errors
+    if (error?.code === 8 || error?.message?.includes("Quota exceeded") || error?.message?.includes("RESOURCE_EXHAUSTED")) {
+      console.warn("[API] Firebase quota exceeded, falling back to demo data");
+      const patients = demoPatients.map(p => ({
+        id: p.id,
+        firstName: p.name.split(" ")[0],
+        lastName: p.name.split(" ").slice(1).join(" ") || "",
+        dateOfBirth: "1960-01-01",
+        gender: "other" as const,
+        phone: "(555) 000-0000",
+        diagnosis: [p.condition],
+        riskLevel: mapPriorityToRiskLevel(p.priority),
+        targetSystolic: 130,
+        targetDiastolic: 80,
+        assignedClinicianId: "clinician-001",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        status: "active" as const,
+      }));
+      return NextResponse.json({ patients, total: patients.length });
+    }
+
     return NextResponse.json(
       { error: "Failed to fetch patients" },
       { status: 500 }

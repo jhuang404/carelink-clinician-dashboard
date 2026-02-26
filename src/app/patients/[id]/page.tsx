@@ -225,7 +225,7 @@ export default function PatientDetails() {
     
     const refreshInterval = setInterval(() => {
       fetchData();
-    }, 30000);
+    }, 60000); // 1 minute
     
     return () => clearInterval(refreshInterval);
   }, [patientId, timeRange]);

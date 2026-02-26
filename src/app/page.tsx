@@ -50,11 +50,9 @@ export default function Dashboard() {
   useEffect(() => {
     fetchPatients();
     
-    // Auto-refresh every 30 seconds
     const refreshInterval = setInterval(() => {
-      console.log('🔄 Auto-refreshing patient data...');
       fetchPatients();
-    }, 30000); // 30 seconds
+    }, 120000); // 2 minutes
     
     return () => clearInterval(refreshInterval);
   }, []);
@@ -70,10 +68,10 @@ export default function Dashboard() {
       const data = await response.json();
       setPatients(data.patients || []);
       
-      // Fetch today's readings for each patient to calculate daily average
+      // Fetch recent readings for each patient (30 days) to get daily averages
       const readingsPromises = data.patients.map(async (patient: PatientProfile) => {
         try {
-          const readingsRes = await fetch(`/api/readings?patientId=${patient.id}&days=1&limit=10`);
+          const readingsRes = await fetch(`/api/readings?patientId=${patient.id}&days=7&limit=20`);
           if (readingsRes.ok) {
             const readingsData = await readingsRes.json();
             return { 
@@ -91,11 +89,12 @@ export default function Dashboard() {
       const allReadings = await Promise.all(readingsPromises);
       const readingsMap: Record<string, any> = {};
       allReadings.forEach(({ patientId, readings, dailyAverages }) => {
-        const todayAvg = dailyAverages?.[0] || null;
+        // Most recent daily average (sorted desc by date from API)
+        const latestDayAvg = dailyAverages?.[0] || null;
         readingsMap[patientId] = {
           latest: readings[0] || null,
-          todayAvg,
-          todayCount: todayAvg?.readingCount || 0,
+          latestDayAvg,
+          dayCount: latestDayAvg?.readingCount || 0,
         };
       });
       setPatientReadings(readingsMap);
@@ -113,8 +112,8 @@ export default function Dashboard() {
     return patients.map(p => {
       const readingData = patientReadings[p.id];
       const latestReading = readingData?.latest;
-      const todayAvg = readingData?.todayAvg;
-      const todayCount = readingData?.todayCount || 0;
+      const latestDayAvg = readingData?.latestDayAvg;
+      const dayCount = readingData?.dayCount || 0;
       const lastContactDate = p.lastContact ? new Date(p.lastContact) : null;
       const now = new Date();
       
@@ -129,12 +128,20 @@ export default function Dashboard() {
         else lastContactStr = `${Math.floor(daysDiff / 30)} months ago`;
       }
       
-      // Use today's daily average if available, otherwise latest reading
+      // Prefer daily average, fall back to latest individual reading
       let bpStr = "—/—";
       let bpTimeStr = "No recent data";
-      if (todayAvg) {
-        bpStr = `${todayAvg.avgSystolic}/${todayAvg.avgDiastolic}`;
-        bpTimeStr = `Today avg (${todayCount} readings)`;
+      if (latestDayAvg) {
+        bpStr = `${latestDayAvg.avgSystolic}/${latestDayAvg.avgDiastolic}`;
+        const avgDate = new Date(latestDayAvg.date + "T00:00:00");
+        const todayStr = now.toISOString().slice(0, 10);
+        if (latestDayAvg.date === todayStr) {
+          bpTimeStr = `Today avg (${dayCount} readings)`;
+        } else {
+          const daysDiff = Math.floor((now.getTime() - avgDate.getTime()) / (1000 * 60 * 60 * 24));
+          const dateLabel = daysDiff === 1 ? "Yesterday" : `${daysDiff}d ago`;
+          bpTimeStr = `${dateLabel} avg (${dayCount} readings)`;
+        }
       } else if (latestReading) {
         bpStr = `${latestReading.systolic}/${latestReading.diastolic}`;
         const readingDate = new Date(latestReading.timestamp);
@@ -144,7 +151,7 @@ export default function Dashboard() {
         else bpTimeStr = `${Math.floor(hoursDiff / 24)}d ago`;
       }
 
-      const avgStatus = todayAvg?.status;
+      const avgStatus = latestDayAvg?.status;
       
       return {
         id: p.id,

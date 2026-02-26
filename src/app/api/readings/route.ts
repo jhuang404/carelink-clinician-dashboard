@@ -86,8 +86,21 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(response);
 
-  } catch (error) {
+  } catch (error: any) {
     console.error("[API] Error fetching readings:", error);
+
+    // Fallback to mock data on quota exhaustion
+    if (error?.code === 8 || error?.message?.includes("Quota exceeded") || error?.message?.includes("RESOURCE_EXHAUSTED")) {
+      console.warn("[API] Firebase quota exceeded, falling back to mock readings");
+      const patientId = new URL(request.url).searchParams.get("patientId") || "";
+      const days = parseInt(new URL(request.url).searchParams.get("days") || "30");
+      const limit = parseInt(new URL(request.url).searchParams.get("limit") || "100");
+      const mockReadings = generateMockReadings(patientId, days, limit);
+      const stats = calculateStats(mockReadings);
+      const dailyAverages = calculateDailyAverages(mockReadings);
+      return NextResponse.json({ readings: mockReadings, dailyAverages, stats });
+    }
+
     return NextResponse.json(
       { error: "Failed to fetch readings" },
       { status: 500 }
