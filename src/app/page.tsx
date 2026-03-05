@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TreatmentPlanDrawer } from "@/components/drawers/TreatmentPlanDrawer";
+import { AddPatientDrawer } from "@/components/drawers/AddPatientDrawer";
 import type { PatientSummary, TreatmentPlan } from "@/types";
 import type { PatientProfile } from "@/types/api";
 
@@ -39,6 +40,7 @@ export default function Dashboard() {
   const router = useRouter();
   const [selectedPatient, setSelectedPatient] = useState<PatientSummary | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [addPatientOpen, setAddPatientOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<"urgency" | "name" | "adherence">("urgency");
   const [patients, setPatients] = useState<PatientProfile[]>([]);
@@ -333,7 +335,10 @@ export default function Dashboard() {
               All Patients ({patients.length})
             </button>
           </div>
-          <button className="btn-primary gap-2">
+          <button
+            onClick={() => setAddPatientOpen(true)}
+            className="btn-primary gap-2"
+          >
             <Plus size={18} />
             Add Patient
           </button>
@@ -602,6 +607,13 @@ export default function Dashboard() {
         patient={selectedPatient}
         onClose={closeDrawer}
         onSave={handleSavePlan}
+      />
+
+      {/* Add Patient Drawer */}
+      <AddPatientDrawer
+        open={addPatientOpen}
+        onClose={() => setAddPatientOpen(false)}
+        onSuccess={fetchPatients}
       />
     </div>
   );
