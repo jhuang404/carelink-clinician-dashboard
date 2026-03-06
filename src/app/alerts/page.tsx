@@ -4,13 +4,13 @@
 export const dynamic = 'force-dynamic';
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import type { Alert as AlertType } from "@/types/api";
 import { 
   Bell, 
   Search, 
   Filter, 
   Download, 
-  Phone, 
   MessageSquare, 
   Check,
   CheckCircle2,
@@ -143,6 +143,7 @@ const demoAlerts: UIAlert[] = [
 ];
 
 export default function AlertManagement() {
+  const router = useRouter();
   const [alerts, setAlerts] = useState<UIAlert[]>([]);
   const [statusFilter, setStatusFilter] = useState<"new" | "acknowledged" | "resolved" | "all">("all");
   const [loading, setLoading] = useState(true);
@@ -290,14 +291,8 @@ export default function AlertManagement() {
    * These are clinical interventions that do NOT change alert state.
    * Calling or messaging a patient is an action, but doesn't mean the alert is resolved.
    */
-  const handleCall = (alert: UIAlert) => {
-    console.log(`Initiating call to ${alert.patient}`);
-    // TODO: Integrate with calling system
-  };
-
   const handleMessage = (alert: UIAlert) => {
-    console.log(`Opening message composer for ${alert.patient}`);
-    // TODO: Open message modal
+    router.push(`/messages?patientId=${alert.patientId}`);
   };
 
   // Filter alerts by status
@@ -513,25 +508,14 @@ export default function AlertManagement() {
                       </button>
                     )}
 
-                    {/* SECONDARY ACTIONS: Clinical interventions (do NOT change alert state) */}
-                    <div className="flex gap-2 mt-1">
-                      <button 
-                        onClick={() => handleCall(alert)}
-                        className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-gray-200 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                        title="Call patient - does not resolve alert"
-                      >
-                        <Phone size={16} />
-                        Call
-                      </button>
-                      <button 
-                        onClick={() => handleMessage(alert)}
-                        className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-gray-200 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                        title="Message patient - does not resolve alert"
-                      >
-                        <MessageSquare size={16} />
-                        Message
-                      </button>
-                    </div>
+                    {/* SECONDARY ACTION: Message patient */}
+                    <button 
+                      onClick={() => handleMessage(alert)}
+                      className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-200 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 mt-1"
+                    >
+                      <MessageSquare size={16} />
+                      Message
+                    </button>
                     
                     {/* Helper text */}
                     <p className="text-[10px] text-gray-400 text-center mt-1">
