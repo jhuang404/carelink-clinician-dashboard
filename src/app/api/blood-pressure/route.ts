@@ -54,17 +54,22 @@ export async function POST(request: NextRequest) {
     // Calculate status based on BP values
     const status = getReadingStatus(body.systolic, body.diastolic);
 
-    const readingData: Record<string, any> = {
+    const readingData: Omit<BPReading, "id"> = {
       patientId: body.patientId,
       systolic: body.systolic,
       diastolic: body.diastolic,
+      pulse: body.pulse ?? undefined,
       timestamp: new Date().toISOString(),
       source: body.source || "patient-app",
+      deviceId: body.deviceId ?? undefined,
       status,
+      patientNote: body.patientNote ?? undefined,
     };
-    if (body.pulse != null) readingData.pulse = body.pulse;
-    if (body.deviceId) readingData.deviceId = body.deviceId;
-    if (body.patientNote) readingData.patientNote = body.patientNote;
+
+    // Strip undefined values before sending to Firestore
+    const firestoreData = Object.fromEntries(
+      Object.entries(readingData).filter(([, v]) => v !== undefined)
+    );
 
     // If Firebase is not configured, return success with mock ID
     if (!isAdminConfigured) {
@@ -88,7 +93,7 @@ export async function POST(request: NextRequest) {
 
     // Firebase is configured - save to Firestore
     const readingsRef = getCollection("readings");
-    const docRef = await readingsRef.add(readingData);
+    const docRef = await readingsRef.add(firestoreData);
 
     const savedReading: BPReading = {
       id: docRef.id,

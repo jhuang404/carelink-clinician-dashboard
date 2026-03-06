@@ -78,22 +78,30 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     const patient = { id: patientDoc.id, ...patientDoc.data() } as PatientProfile;
 
-    // Fetch recent readings (last 30 days)
+    // Fetch recent readings (last 30 days) without requiring composite index.
+    // Query only by patientId, then filter/sort in memory.
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    
+    const threshold = thirtyDaysAgo.toISOString();
+
     const readingsRef = getCollection("readings");
     const readingsSnapshot = await readingsRef
       .where("patientId", "==", id)
-      .where("timestamp", ">=", thirtyDaysAgo.toISOString())
-      .orderBy("timestamp", "desc")
-      .limit(100)
+      .limit(300)
       .get();
 
     const readings: BPReading[] = [];
     readingsSnapshot.forEach((doc) => {
-      readings.push({ id: doc.id, ...doc.data() } as BPReading);
+      const reading = { id: doc.id, ...doc.data() } as BPReading;
+      if (reading.timestamp >= threshold) {
+        readings.push(reading);
+      }
     });
+
+    readings.sort(
+      (a, b) =>
+        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    );
 
     // Fetch notes
     const notesRef = getCollection("clinicianNotes");
@@ -110,7 +118,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     const response: GetPatientResponse = {
       patient,
-      recentReadings: readings,
+      recentReadings: readings.slice(0, 100),
       notes,
     };
 

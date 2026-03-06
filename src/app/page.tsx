@@ -71,7 +71,7 @@ export default function Dashboard() {
       const data = await response.json();
       setPatients(data.patients || []);
       
-      // Fetch recent readings for each patient (30 days) to get daily averages
+      // Fetch recent readings for each patient
       const readingsPromises = data.patients.map(async (patient: PatientProfile) => {
         try {
           const readingsRes = await fetch(`/api/readings?patientId=${patient.id}&days=7&limit=20`);
@@ -131,27 +131,22 @@ export default function Dashboard() {
         else lastContactStr = `${Math.floor(daysDiff / 30)} months ago`;
       }
       
-      // Prefer daily average, fall back to latest individual reading
+      // Use latest individual reading for more real-time dashboard feedback
       let bpStr = "—/—";
       let bpTimeStr = "No recent data";
-      if (latestDayAvg) {
-        bpStr = `${latestDayAvg.avgSystolic}/${latestDayAvg.avgDiastolic}`;
-        const avgDate = new Date(latestDayAvg.date + "T00:00:00");
-        const todayStr = now.toISOString().slice(0, 10);
-        if (latestDayAvg.date === todayStr) {
-          bpTimeStr = `Today avg (${dayCount} readings)`;
-        } else {
-          const daysDiff = Math.floor((now.getTime() - avgDate.getTime()) / (1000 * 60 * 60 * 24));
-          const dateLabel = daysDiff === 1 ? "Yesterday" : `${daysDiff}d ago`;
-          bpTimeStr = `${dateLabel} avg (${dayCount} readings)`;
-        }
-      } else if (latestReading) {
+      if (latestReading) {
         bpStr = `${latestReading.systolic}/${latestReading.diastolic}`;
         const readingDate = new Date(latestReading.timestamp);
         const hoursDiff = Math.floor((now.getTime() - readingDate.getTime()) / (1000 * 60 * 60));
         if (hoursDiff < 1) bpTimeStr = "Just now";
         else if (hoursDiff < 24) bpTimeStr = `${hoursDiff}h ago`;
         else bpTimeStr = `${Math.floor(hoursDiff / 24)}d ago`;
+      } else if (latestDayAvg) {
+        bpStr = `${latestDayAvg.avgSystolic}/${latestDayAvg.avgDiastolic}`;
+        const avgDate = new Date(latestDayAvg.date + "T00:00:00");
+        const daysDiff = Math.floor((now.getTime() - avgDate.getTime()) / (1000 * 60 * 60 * 24));
+        const dateLabel = daysDiff === 0 ? "Today" : daysDiff === 1 ? "Yesterday" : `${daysDiff}d ago`;
+        bpTimeStr = `${dateLabel} avg (${dayCount} readings)`;
       }
 
       const avgStatus = latestDayAvg?.status;
@@ -284,8 +279,9 @@ export default function Dashboard() {
    */
   const handleSecondaryAction = (e: React.MouseEvent, action: string, patient: PatientSummary) => {
     e.stopPropagation();
-    console.log(`${action} action for patient:`, patient.name);
-    // TODO: Implement action handlers
+    if (action === "message") {
+      router.push(`/messages?patientId=${patient.id}`);
+    }
   };
 
   const handleDeletePatient = async (e: React.MouseEvent, patient: PatientSummary) => {
@@ -445,7 +441,7 @@ export default function Dashboard() {
                 <th className="px-6 py-4"><input type="checkbox" className="rounded border-gray-300" /></th>
                 <th className="px-6 py-4">Priority</th>
                 <th className="px-6 py-4">Patient</th>
-                <th className="px-6 py-4">Today&apos;s Avg BP</th>
+                <th className="px-6 py-4">Latest BP</th>
                 <th className="px-6 py-4">Trend</th>
                 <th className="px-6 py-4">Adherence</th>
                 <th className="px-6 py-4">Last Contact</th>

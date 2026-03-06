@@ -7,7 +7,6 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
-  Phone,
   MessageSquare,
   TrendingUp,
   TrendingDown,
@@ -18,6 +17,9 @@ import {
   AlertTriangle,
   Download,
   ClipboardEdit,
+  Send,
+  Bell,
+  X,
 } from "lucide-react";
 import {
   LineChart,
@@ -168,6 +170,15 @@ export default function PatientDetails() {
   const [readingsStats, setReadingsStats] = useState<any>(null);
   const [patientData, setPatientData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+
+  // Reminder modal
+  const [reminderOpen, setReminderOpen] = useState(false);
+  const [reminderMethod, setReminderMethod] = useState<"email" | "sms">("email");
+  const [reminderTo, setReminderTo] = useState("");
+  const [reminderMsg, setReminderMsg] = useState("Hi, this is a reminder from your care team to please take your blood pressure reading today. Thank you!");
+  const [reminderSending, setReminderSending] = useState(false);
+  const [reminderSent, setReminderSent] = useState(false);
+
   
   // Fetch patient data and readings from API
   useEffect(() => {
@@ -207,7 +218,40 @@ export default function PatientDetails() {
     
     return () => clearInterval(refreshInterval);
   }, [patientId, timeRange]);
-  
+
+
+  const handleSendReminder = async () => {
+    setReminderSending(true);
+    try {
+      const to = reminderTo;
+      const res = await fetch("/api/reminders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to,
+          patientName: patientData ? `${patientData.firstName} ${patientData.lastName}` : patientId,
+          message: reminderMsg,
+          method: reminderMethod,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        alert(err.error || "Failed to send reminder");
+        setReminderSending(false);
+        return;
+      }
+      setReminderSending(false);
+      setReminderSent(true);
+      setTimeout(() => {
+        setReminderSent(false);
+        setReminderOpen(false);
+      }, 2500);
+    } catch {
+      alert("Failed to send reminder");
+      setReminderSending(false);
+    }
+  };
+
   // Convert API patient data to component format
   let patient;
   if (patientData) {
@@ -332,11 +376,10 @@ export default function PatientDetails() {
             <AlertTriangle size={14} />
             {patient.priority} Priority
           </span>
-          <button className="flex items-center gap-2 rounded-lg bg-magenta-600 px-4 py-2 text-sm font-medium text-white hover:bg-magenta-700">
-            <Phone size={16} />
-            Call Patient
-          </button>
-          <button className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+          <button
+            onClick={() => router.push(`/messages?patientId=${patientId}`)}
+            className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
             <MessageSquare size={16} />
             Send Message
           </button>
@@ -680,33 +723,60 @@ export default function PatientDetails() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {patient.readings.map((reading, index) => (
-                  <tr key={index} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 text-sm text-gray-900">{reading.date}</td>
-                    <td className="px-6 py-4 text-sm text-gray-500">{reading.time}</td>
-                    <td className={cn(
-                      "px-6 py-4 text-sm font-bold",
-                      reading.systolic >= 180 ? "text-red-600" : 
-                      reading.systolic >= 140 ? "text-orange-600" : "text-gray-900"
-                    )}>{reading.systolic}</td>
-                    <td className={cn(
-                      "px-6 py-4 text-sm font-bold",
-                      reading.diastolic >= 110 ? "text-red-600" : 
-                      reading.diastolic >= 90 ? "text-orange-600" : "text-gray-900"
-                    )}>{reading.diastolic}</td>
-                    <td className="px-6 py-4">
-                      <span className={cn(
-                        "rounded-full px-2 py-0.5 text-xs font-medium",
-                        reading.status === "Critical" && "bg-red-100 text-red-700",
-                        reading.status === "High" && "bg-orange-100 text-orange-700",
-                        reading.status === "Elevated" && "bg-yellow-100 text-yellow-700",
-                        reading.status === "Normal" && "bg-green-100 text-green-700"
-                      )}>
-                        {reading.status}
-                      </span>
+                {bpReadings.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-8 text-center text-sm text-gray-400">
+                      No individual readings available yet
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  bpReadings.slice(0, 10).map((reading, index) => {
+                    const statusLabel =
+                      reading.status === "critical"
+                        ? "Critical"
+                        : reading.status === "high"
+                        ? "High"
+                        : reading.status === "elevated"
+                        ? "Elevated"
+                        : "Normal";
+
+                    return (
+                      <tr key={index} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 text-sm text-gray-900">
+                          {new Date(reading.timestamp).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-500">
+                          {new Date(reading.timestamp).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
+                        </td>
+                        <td className={cn(
+                          "px-6 py-4 text-sm font-bold",
+                          reading.systolic >= 180 ? "text-red-600" :
+                          reading.systolic >= 140 ? "text-orange-600" : "text-gray-900"
+                        )}>
+                          {reading.systolic}
+                        </td>
+                        <td className={cn(
+                          "px-6 py-4 text-sm font-bold",
+                          reading.diastolic >= 110 ? "text-red-600" :
+                          reading.diastolic >= 90 ? "text-orange-600" : "text-gray-900"
+                        )}>
+                          {reading.diastolic}
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={cn(
+                            "rounded-full px-2 py-0.5 text-xs font-medium",
+                            statusLabel === "Critical" && "bg-red-100 text-red-700",
+                            statusLabel === "High" && "bg-orange-100 text-orange-700",
+                            statusLabel === "Elevated" && "bg-yellow-100 text-yellow-700",
+                            statusLabel === "Normal" && "bg-green-100 text-green-700"
+                          )}>
+                            {statusLabel}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
           </div>
@@ -801,18 +871,114 @@ export default function PatientDetails() {
                 <Pill size={18} />
                 Adjust Medication
               </button>
-              <button className="flex w-full items-center gap-3 rounded-lg border border-gray-200 bg-white p-3 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
-                <Calendar size={18} />
-                Schedule Follow-up
-              </button>
-              <button className="flex w-full items-center gap-3 rounded-lg border border-gray-200 bg-white p-3 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
-                <Clock size={18} />
-                Set Reminder
+              <button
+                onClick={() => {
+                  setReminderSent(false);
+                  setReminderTo(patientData?.email || "");
+                  setReminderOpen(true);
+                }}
+                className="flex w-full items-center gap-3 rounded-lg border border-gray-200 bg-white p-3 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                <Bell size={18} />
+                Send BP Reminder
               </button>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Send Reminder Modal */}
+      {reminderOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-lg font-bold text-gray-900">Send BP Reminder</h3>
+              <button onClick={() => setReminderOpen(false)} className="text-gray-400 hover:text-gray-600">
+                <X size={20} />
+              </button>
+            </div>
+
+            {reminderSent ? (
+              <div className="text-center py-8">
+                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-green-100 text-green-600">
+                  <Send size={20} />
+                </div>
+                <p className="font-semibold text-gray-900">Reminder Sent!</p>
+                <p className="text-sm text-gray-500 mt-1">
+                  {reminderMethod === "email" ? "Email" : "SMS"} sent to {patient?.name}
+                </p>
+              </div>
+            ) : (
+              <>
+                <p className="text-sm text-gray-500 mb-4">
+                  Send a BP measurement reminder to <span className="font-medium text-gray-900">{patient?.name}</span>
+                </p>
+
+                <div className="flex gap-2 mb-4">
+                  {(["email", "sms"] as const).map(m => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => {
+                        setReminderMethod(m);
+                        setReminderTo(m === "email" ? (patientData?.email || "") : (patientData?.phone || ""));
+                      }}
+                      className={cn(
+                        "flex-1 rounded-lg border py-2 text-sm font-medium transition-colors",
+                        reminderMethod === m
+                          ? "border-magenta-500 bg-magenta-50 text-magenta-700"
+                          : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                      )}
+                    >
+                      {m === "email" ? "Email" : "SMS"}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="mb-2">
+                  <label className="text-xs font-medium text-gray-500 mb-1 block">
+                    {reminderMethod === "email" ? "To (email)" : "Phone"}
+                  </label>
+                  <input
+                    value={reminderTo}
+                    onChange={(e) => setReminderTo(e.target.value)}
+                    placeholder={reminderMethod === "email" ? "patient@email.com" : "(xxx) xxx-xxxx"}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 focus:border-magenta-500 focus:outline-none"
+                  />
+                </div>
+
+                <div className="mb-5">
+                  <label className="text-xs font-medium text-gray-500 mb-1 block">Message</label>
+                  <textarea
+                    value={reminderMsg}
+                    onChange={(e) => setReminderMsg(e.target.value)}
+                    rows={3}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-magenta-500 focus:outline-none resize-none"
+                  />
+                </div>
+
+                <button
+                  onClick={handleSendReminder}
+                  disabled={reminderSending}
+                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-magenta-600 py-2.5 text-sm font-semibold text-white hover:bg-magenta-700 disabled:opacity-50"
+                >
+                  {reminderSending ? (
+                    <>
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <Send size={16} />
+                      Send Reminder
+                    </>
+                  )}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Treatment Plan Drawer */}
       <TreatmentPlanDrawer
