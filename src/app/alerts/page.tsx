@@ -493,7 +493,7 @@ export default function AlertManagement() {
                   </div>
 
                   {/* Action Buttons */}
-                  <div className="flex flex-col gap-2 min-w-[160px]">
+                  <div className="flex flex-col gap-2 min-w-[200px]">
                     {/* PRIMARY ACTION: Changes alert state */}
                     {alert.status === "new" ? (
                       <button 
