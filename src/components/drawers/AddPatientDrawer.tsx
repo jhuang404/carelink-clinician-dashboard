@@ -12,6 +12,7 @@ interface AddPatientDrawerProps {
 }
 
 interface PatientForm {
+  deviceId: string;
   firstName: string;
   lastName: string;
   dateOfBirth: string;
@@ -25,6 +26,7 @@ interface PatientForm {
 }
 
 const emptyForm: PatientForm = {
+  deviceId: "",
   firstName: "",
   lastName: "",
   dateOfBirth: "",
@@ -70,6 +72,7 @@ export function AddPatientDrawer({ open, onClose, onSuccess }: AddPatientDrawerP
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          id: form.deviceId.trim() || undefined,
           firstName: form.firstName.trim(),
           lastName: form.lastName.trim(),
           dateOfBirth: form.dateOfBirth,
@@ -130,6 +133,21 @@ export function AddPatientDrawer({ open, onClose, onSuccess }: AddPatientDrawerP
 
       {/* Form */}
       <div className="flex-1 overflow-y-auto p-6 space-y-5">
+        {/* Device / Patient ID */}
+        <div className="rounded-lg border border-magenta-200 bg-magenta-50 p-4">
+          <label className={cn(labelClass, "text-magenta-600")}>Device ID (iPad Patient App)</label>
+          <input
+            type="text"
+            value={form.deviceId}
+            onChange={e => update("deviceId", e.target.value)}
+            placeholder="e.g. P-2025-005"
+            className={cn(inputClass, "border-magenta-200 focus:border-magenta-500 bg-white")}
+          />
+          <p className="mt-1.5 text-[11px] text-magenta-500">
+            Enter the device ID from the iPad app to link BP readings automatically. Leave blank to auto-generate.
+          </p>
+        </div>
+
         {/* Name */}
         <div className="grid grid-cols-2 gap-4">
           <div>

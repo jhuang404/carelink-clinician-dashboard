@@ -169,15 +169,12 @@ export async function POST(request: NextRequest) {
     }
 
     const now = new Date().toISOString();
-    const patientData: Omit<PatientProfile, "id"> = {
+    const patientData: Record<string, any> = {
       firstName: body.firstName,
       lastName: body.lastName,
       dateOfBirth: body.dateOfBirth,
       gender: body.gender || "other",
       phone: body.phone,
-      email: body.email,
-      address: body.address,
-      emergencyContact: body.emergencyContact,
       diagnosis: body.diagnosis || [],
       riskLevel: body.riskLevel || "moderate",
       targetSystolic: body.targetSystolic || 130,
@@ -189,11 +186,32 @@ export async function POST(request: NextRequest) {
       status: "active",
     };
 
+    if (body.email) patientData.email = body.email;
+    if (body.address) patientData.address = body.address;
+    if (body.emergencyContact) patientData.emergencyContact = body.emergencyContact;
+
     const patientsRef = getCollection("patients");
-    const docRef = await patientsRef.add(patientData);
+
+    // Use custom ID (device ID) if provided, otherwise auto-generate
+    let docId: string;
+    if (body.id && body.id.trim()) {
+      docId = body.id.trim();
+      // Check if ID already exists
+      const existing = await patientsRef.doc(docId).get();
+      if (existing.exists) {
+        return NextResponse.json(
+          { error: `Patient with ID "${docId}" already exists.` },
+          { status: 409 }
+        );
+      }
+      await patientsRef.doc(docId).set(patientData);
+    } else {
+      const docRef = await patientsRef.add(patientData);
+      docId = docRef.id;
+    }
 
     return NextResponse.json(
-      { id: docRef.id, ...patientData },
+      { id: docId, ...patientData },
       { status: 201 }
     );
 

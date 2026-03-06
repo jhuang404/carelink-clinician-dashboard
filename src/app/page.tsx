@@ -16,7 +16,8 @@ import {
   TrendingDown,
   Minus,
   ClipboardEdit,
-  AlertCircle
+  AlertCircle,
+  Trash2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TreatmentPlanDrawer } from "@/components/drawers/TreatmentPlanDrawer";
@@ -285,6 +286,23 @@ export default function Dashboard() {
     e.stopPropagation();
     console.log(`${action} action for patient:`, patient.name);
     // TODO: Implement action handlers
+  };
+
+  const handleDeletePatient = async (e: React.MouseEvent, patient: PatientSummary) => {
+    e.stopPropagation();
+    if (!confirm(`Delete patient "${patient.name}" (${patient.id})? This cannot be undone.`)) return;
+
+    try {
+      const res = await fetch(`/api/patients/${patient.id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || "Failed to delete patient");
+        return;
+      }
+      fetchPatients();
+    } catch (err) {
+      alert("Failed to delete patient");
+    }
   };
 
   const closeDrawer = () => {
@@ -583,6 +601,13 @@ export default function Dashboard() {
                           title="Call patient"
                         >
                           <Phone size={16} />
+                        </button>
+                        <button
+                          onClick={(e) => handleDeletePatient(e, patient)}
+                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Delete patient"
+                        >
+                          <Trash2 size={16} />
                         </button>
                       </div>
                     </td>

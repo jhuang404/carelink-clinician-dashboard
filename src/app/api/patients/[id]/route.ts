@@ -174,6 +174,43 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   }
 }
 
+/**
+ * DELETE /api/patients/[id]
+ */
+export async function DELETE(request: NextRequest, { params }: RouteParams) {
+  try {
+    const { id } = await params;
+
+    if (!isAdminConfigured) {
+      return NextResponse.json(
+        { error: "Firebase not configured. Cannot delete patients in demo mode." },
+        { status: 503 }
+      );
+    }
+
+    const patientsRef = getCollection("patients");
+    const patientDoc = await patientsRef.doc(id).get();
+
+    if (!patientDoc.exists) {
+      return NextResponse.json(
+        { error: "Patient not found" },
+        { status: 404 }
+      );
+    }
+
+    await patientsRef.doc(id).delete();
+
+    return NextResponse.json({ success: true, id });
+
+  } catch (error) {
+    console.error("[API] Error deleting patient:", error);
+    return NextResponse.json(
+      { error: "Failed to delete patient" },
+      { status: 500 }
+    );
+  }
+}
+
 // Helper functions
 
 function mapPriorityToRiskLevel(priority: string): PatientProfile["riskLevel"] {
