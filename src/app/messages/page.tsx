@@ -68,13 +68,13 @@ function MessagesContent() {
             const real = patientMap[conv.patient.id];
             if (!real) return conv;
             const fullName = `${real.firstName} ${real.lastName}`;
-            const riskMap: Record<string, string> = { critical: "Critical", high: "Moderate", moderate: "Moderate", low: "Follow-up", stable: "Stable" };
+            const riskMap: Record<string, "Critical" | "Moderate" | "Stable" | "Follow-up"> = { critical: "Critical", high: "Moderate", moderate: "Moderate", low: "Follow-up", stable: "Stable" };
             return {
               ...conv,
               patient: {
                 ...conv.patient,
                 name: fullName,
-                priority: riskMap[real.riskLevel] || conv.patient.priority,
+                priority: riskMap[real.riskLevel] ?? conv.patient.priority,
                 avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${real.id}`,
               },
               participant: conv.participant.role === "patient"

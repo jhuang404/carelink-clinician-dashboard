@@ -87,7 +87,7 @@ const getPatientById = (id: string) => ({
   priority: "Moderate" as const,
   bp: "—/—",
   bpTime: "No data",
-  trend: "stable" as const,
+  trend: "stable" as "up" | "down" | "stable",
   adherence: 0,
   lastContact: "Unknown",
   avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${id}`,

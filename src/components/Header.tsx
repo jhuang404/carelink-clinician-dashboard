@@ -1,15 +1,12 @@
-import { Bell, ChevronDown } from "lucide-react";
-import Link from "next/link";
+"use client";
 
-/**
- * HEADER COMPONENT
- * 
- * Simplified notification area:
- * - Bell icon links to Alert Management (no ambiguous numeric badge)
- * - Clinician profile for account context only
- */
+import { Bell } from "lucide-react";
+import Link from "next/link";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function Header() {
+  const { clinician } = useAuth();
+
   return (
     <header className="sticky top-0 z-30 flex h-20 w-full items-center justify-between border-b bg-white px-8">
       <div className="flex items-center gap-4">
@@ -20,7 +17,6 @@ export default function Header() {
       </div>
 
       <div className="flex items-center gap-6">
-        {/* Alerts link - navigates to Alert Management page */}
         <Link 
           href="/alerts"
           className="flex h-10 w-10 items-center justify-center rounded-full border bg-white text-gray-600 hover:bg-gray-50 hover:text-magenta-600 transition-colors"
@@ -29,20 +25,18 @@ export default function Header() {
           <Bell size={20} />
         </Link>
 
-        {/* Clinician profile - account context only */}
         <div className="flex items-center gap-3 border-l pl-6">
           <div className="text-right">
-            <p className="text-sm font-bold text-gray-900">Dr. Sarah Chen</p>
-            <p className="text-xs text-gray-500">Cardiologist</p>
+            <p className="text-sm font-bold text-gray-900">{clinician?.name || "Clinician"}</p>
+            <p className="text-xs text-gray-500">{clinician?.specialty || ""}</p>
           </div>
           <div className="h-10 w-10 overflow-hidden rounded-full bg-gray-200">
             <img 
-              src="https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah" 
-              alt="Dr. Sarah Chen" 
+              src={clinician?.avatar || ""} 
+              alt={clinician?.name || ""} 
               className="h-full w-full object-cover"
             />
           </div>
-          <ChevronDown size={16} className="text-gray-400" />
         </div>
       </div>
     </header>

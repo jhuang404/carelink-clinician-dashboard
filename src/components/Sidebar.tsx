@@ -6,9 +6,11 @@ import {
   LayoutDashboard, 
   Bell, 
   MessageSquare, 
-  Activity
+  Activity,
+  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
 
 const menuItems = [
   { name: "Patient Overview", icon: LayoutDashboard, href: "/" },
@@ -18,6 +20,7 @@ const menuItems = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const { clinician, logout } = useAuth();
 
   return (
     <aside className="flex h-screen w-64 flex-col border-r bg-white">
@@ -51,12 +54,25 @@ export default function Sidebar() {
         })}
       </nav>
 
+      {/* Clinician profile & logout */}
       <div className="border-t p-4">
-        <div className="rounded-xl bg-magenta-50 p-4">
-          <p className="text-xs font-bold text-magenta-700 uppercase tracking-wider">Quick Tip</p>
-          <p className="mt-1 text-xs text-magenta-600">
-            Click "Edit Plan" on any patient row to quickly update their treatment plan.
-          </p>
+        <div className="flex items-center gap-3 rounded-lg px-2 py-2">
+          <img
+            src={clinician?.avatar || ""}
+            alt={clinician?.name || ""}
+            className="h-9 w-9 rounded-full bg-gray-200"
+          />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-gray-900 truncate">{clinician?.name}</p>
+            <p className="text-xs text-gray-500 truncate">{clinician?.specialty}</p>
+          </div>
+          <button
+            onClick={logout}
+            className="shrink-0 rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+            title="Sign out"
+          >
+            <LogOut size={18} />
+          </button>
         </div>
       </div>
     </aside>
