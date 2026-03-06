@@ -49,6 +49,7 @@ function MessagesContent() {
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [messageInput, setMessageInput] = useState("");
+  const [didAutoSelect, setDidAutoSelect] = useState(false);
 
   // Fetch real patients and update conversations to use real names
   useEffect(() => {
@@ -99,16 +100,60 @@ function MessagesContent() {
       )
     : conversations;
 
-  // Handle URL param for preselecting conversation
+  // Handle URL param for preselecting conversation (run once after patient names sync)
   useEffect(() => {
+    if (didAutoSelect) return;
     const patientId = searchParams.get("patientId");
-    if (patientId) {
-      const conv = conversations.find(c => c.patient.id === patientId);
-      if (conv) {
-        handleSelectConversation(conv);
-      }
+    if (!patientId) return;
+
+    const conv = conversations.find(c => c.patient.id === patientId);
+    if (conv) {
+      handleSelectConversation(conv);
+      setDidAutoSelect(true);
+      return;
     }
-  }, [searchParams, conversations]);
+
+    // No existing conversation for this patient — create a new one dynamically
+    const createNewConversation = async () => {
+      let patientName = `Patient ${patientId}`;
+      let priority: "Critical" | "Moderate" | "Stable" | "Follow-up" = "Moderate";
+      try {
+        const res = await fetch(`/api/patients/${patientId}`);
+        if (res.ok) {
+          const p = await res.json();
+          patientName = `${p.firstName} ${p.lastName}`;
+          const riskMap: Record<string, "Critical" | "Moderate" | "Stable" | "Follow-up"> = { critical: "Critical", high: "Moderate", moderate: "Moderate", low: "Follow-up", stable: "Stable" };
+          priority = riskMap[p.riskLevel] ?? "Moderate";
+        }
+      } catch {}
+
+      const newConv: Conversation = {
+        id: `conv-${patientId}`,
+        patient: {
+          id: patientId,
+          name: patientName,
+          priority,
+          avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${patientId}`,
+        },
+        participant: {
+          id: `patient-${patientId}`,
+          name: patientName,
+          role: "patient",
+          avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${patientId}`,
+        },
+        unreadCount: 0,
+        lastMessageAt: "Now",
+        lastMessagePreview: "New conversation",
+        messages: [],
+      };
+
+      setConversations(prev => [newConv, ...prev]);
+      handleSelectConversation(newConv);
+      setDidAutoSelect(true);
+    };
+
+    createNewConversation();
+  }, [searchParams, conversations, didAutoSelect]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
