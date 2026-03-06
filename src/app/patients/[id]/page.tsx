@@ -253,9 +253,14 @@ export default function PatientDetails() {
   };
 
   // Convert API patient data to component format
-  let patient;
+  const latestReading = bpReadings[0];
+  const bpTrend = (
+    latestReading?.status === 'critical' || latestReading?.status === 'high' ? 'up' : 'stable'
+  ) as "up" | "down" | "stable";
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let patient: any;
   if (patientData) {
-    const latestReading = bpReadings[0];
     patient = {
       id: patientData.id,
       name: `${patientData.firstName} ${patientData.lastName}`,
@@ -265,8 +270,8 @@ export default function PatientDetails() {
       priority: mapRiskLevelToPriority(patientData.riskLevel),
       bp: latestReading ? `${latestReading.systolic}/${latestReading.diastolic}` : "—/—",
       bpTime: latestReading ? formatRelativeTime(latestReading.timestamp) : "No data",
-      trend: latestReading?.status === 'critical' || latestReading?.status === 'high' ? 'up' as const : 'stable' as const,
-      adherence: 85, // TODO: Calculate from medication logs
+      trend: bpTrend,
+      adherence: 85,
       lastContact: patientData.lastContact ? formatRelativeTime(patientData.lastContact) : "No contact",
       avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${patientData.id}`,
       riskLevel: patientData.riskLevel === 'high' ? 'High' : patientData.riskLevel === 'medium' ? 'Medium' : 'Low',
@@ -274,19 +279,16 @@ export default function PatientDetails() {
         name: med.name,
         dose: med.dosage,
         type: med.class || "Medication",
-        adherence: 85 // Placeholder
+        adherence: 85,
       })) || [],
-      readings: bpReadings.slice(0, 10).map(r => ({
-        date: new Date(r.timestamp).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
-        time: new Date(r.timestamp).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
-        systolic: r.systolic,
-        diastolic: r.diastolic,
-        status: r.status === 'critical' ? 'Critical' : r.status === 'high' ? 'High' : r.status === 'elevated' ? 'Elevated' : 'Normal'
-      }))
     };
   } else {
-    // Fallback to mock data
-    patient = getPatientById(patientId);
+    patient = {
+      ...getPatientById(patientId),
+      bp: latestReading ? `${latestReading.systolic}/${latestReading.diastolic}` : "—/—",
+      bpTime: latestReading ? formatRelativeTime(latestReading.timestamp) : "No data",
+      trend: bpTrend,
+    };
   }
   
   // Daily averages chart data (primary view)

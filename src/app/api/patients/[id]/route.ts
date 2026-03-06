@@ -103,18 +103,27 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
     );
 
-    // Fetch notes
-    const notesRef = getCollection("clinicianNotes");
-    const notesSnapshot = await notesRef
-      .where("patientId", "==", id)
-      .orderBy("createdAt", "desc")
-      .limit(20)
-      .get();
+    // Fetch notes (no composite index needed)
+    let notes: ClinicianNote[] = [];
+    try {
+      const notesRef = getCollection("clinicianNotes");
+      const notesSnapshot = await notesRef
+        .where("patientId", "==", id)
+        .limit(50)
+        .get();
 
-    const notes: ClinicianNote[] = [];
-    notesSnapshot.forEach((doc) => {
-      notes.push({ id: doc.id, ...doc.data() } as ClinicianNote);
-    });
+      notesSnapshot.forEach((doc) => {
+        notes.push({ id: doc.id, ...doc.data() } as ClinicianNote);
+      });
+
+      notes.sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+      notes = notes.slice(0, 20);
+    } catch (notesErr) {
+      console.warn("[API] Notes fetch failed, continuing without notes:", notesErr);
+    }
 
     const response: GetPatientResponse = {
       patient,
