@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const RESEND_API_KEY = process.env.RESEND_API_KEY;
-
 export async function POST(request: NextRequest) {
   try {
     const { to, patientName, message, method } = await request.json();
@@ -11,6 +9,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (method === "email") {
+      const RESEND_API_KEY = process.env.RESEND_API_KEY;
       if (!RESEND_API_KEY) {
         return NextResponse.json({ error: "RESEND_API_KEY not configured in .env.local" }, { status: 503 });
       }
