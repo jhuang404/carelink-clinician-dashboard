@@ -595,13 +595,6 @@ export default function Dashboard() {
                         >
                           <MessageSquare size={16} />
                         </button>
-                        <button 
-                          onClick={(e) => handleSecondaryAction(e, "call", patient)}
-                          className="p-1.5 text-gray-400 hover:text-magenta-600 hover:bg-gray-100 rounded-lg transition-colors"
-                          title="Call patient"
-                        >
-                          <Phone size={16} />
-                        </button>
                         <button
                           onClick={(e) => handleDeletePatient(e, patient)}
                           className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"

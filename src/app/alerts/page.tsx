@@ -205,20 +205,10 @@ export default function AlertManagement() {
         };
       });
       
-      // Always prioritize real data over demo data
-      // If there's any real data from Firebase, ONLY show real data (even if incomplete)
-      // Only use demo data as complete fallback when Firebase has NO data at all
-      if (data.alerts && data.alerts.length > 0) {
-        console.log(`📋 Using Firebase data: ${uiAlerts.length} real alerts`);
-        setAlerts(uiAlerts);
-      } else {
-        console.log(`📋 No Firebase data, using demo alerts: ${demoAlerts.length} demo alerts`);
-        setAlerts(demoAlerts);
-      }
+      setAlerts(uiAlerts);
     } catch (err) {
       console.error('Error fetching alerts:', err);
-      // Fallback to demo data on error
-      setAlerts(demoAlerts);
+      setAlerts([]);
     } finally {
       setLoading(false);
     }

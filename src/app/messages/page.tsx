@@ -19,6 +19,7 @@ import {
 import { cn } from "@/lib/utils";
 import { demoConversations, searchConversations } from "@/data/demoMessages";
 import type { Conversation, Message, ParticipantRole } from "@/types/messages";
+import type { PatientProfile } from "@/types/api";
 
 /**
  * MESSAGES PAGE
@@ -49,9 +50,53 @@ function MessagesContent() {
   const [searchQuery, setSearchQuery] = useState("");
   const [messageInput, setMessageInput] = useState("");
 
+  // Fetch real patients and update conversations to use real names
+  useEffect(() => {
+    const syncPatientNames = async () => {
+      try {
+        const res = await fetch("/api/patients");
+        if (!res.ok) return;
+        const data = await res.json();
+        const patients: PatientProfile[] = data.patients || [];
+        if (patients.length === 0) return;
+
+        const patientMap: Record<string, PatientProfile> = {};
+        patients.forEach(p => { patientMap[p.id] = p; });
+
+        setConversations(prev =>
+          prev.map(conv => {
+            const real = patientMap[conv.patient.id];
+            if (!real) return conv;
+            const fullName = `${real.firstName} ${real.lastName}`;
+            const riskMap: Record<string, string> = { critical: "Critical", high: "Moderate", moderate: "Moderate", low: "Follow-up", stable: "Stable" };
+            return {
+              ...conv,
+              patient: {
+                ...conv.patient,
+                name: fullName,
+                priority: riskMap[real.riskLevel] || conv.patient.priority,
+                avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${real.id}`,
+              },
+              participant: conv.participant.role === "patient"
+                ? { ...conv.participant, name: fullName, avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${real.id}` }
+                : conv.participant,
+            };
+          })
+        );
+      } catch (err) {
+        // keep demo data on error
+      }
+    };
+    syncPatientNames();
+  }, []);
+
   // Filter conversations based on search
   const filteredConversations = searchQuery 
-    ? searchConversations(searchQuery)
+    ? conversations.filter(c =>
+        c.patient.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        c.patient.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        c.participant.name.toLowerCase().includes(searchQuery.toLowerCase())
+      )
     : conversations;
 
   // Handle URL param for preselecting conversation
@@ -63,7 +108,7 @@ function MessagesContent() {
         handleSelectConversation(conv);
       }
     }
-  }, [searchParams]);
+  }, [searchParams, conversations]);
 
   // Scroll to bottom when messages change
   useEffect(() => {

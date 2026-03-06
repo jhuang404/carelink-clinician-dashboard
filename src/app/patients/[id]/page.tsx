@@ -80,45 +80,23 @@ const generateBPData = (patientId: string) => {
   return data;
 };
 
-// Mock patient data
-const getPatientById = (id: string): Patient & { 
-  age: number; 
-  gender: string;
-  condition: string;
-  riskLevel: string;
-  medications: { name: string; dose: string; type: string; adherence: number }[];
-  readings: { date: string; time: string; systolic: number; diastolic: number; status: string }[];
-} => ({
+// Fallback patient data when API is unavailable
+const getPatientById = (id: string) => ({
   id,
-  name: id === "P-2025-001" ? "Maria Rodriguez" : 
-        id === "P-2025-002" ? "James Wilson" :
-        id === "P-2025-003" ? "Sarah Johnson" : "Michael Chen",
-  priority: id === "P-2025-001" ? "Critical" : 
-            id === "P-2025-002" ? "Moderate" :
-            id === "P-2025-003" ? "Stable" : "Follow-up",
-  bp: id === "P-2025-001" ? "185/110" : 
-      id === "P-2025-002" ? "165/95" :
-      id === "P-2025-003" ? "125/82" : "135/88",
-  bpTime: "2 hours ago",
-  trend: id === "P-2025-001" ? "up" : id === "P-2025-003" ? "stable" : "down",
-  adherence: id === "P-2025-001" ? 45 : id === "P-2025-002" ? 72 : 85,
-  lastContact: "3 days ago",
-  avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${id === "P-2025-001" ? "Maria" : id === "P-2025-002" ? "James" : id === "P-2025-003" ? "SarahJ" : "Michael"}`,
-  age: 58,
-  gender: "Female",
-  condition: "Hypertension Stage 2",
-  riskLevel: id === "P-2025-001" ? "High" : id === "P-2025-002" ? "Medium" : "Low",
-  medications: [
-    { name: "Lisinopril", dose: "10mg", type: "ACE Inhibitor", adherence: 45 },
-    { name: "Amlodipine", dose: "5mg", type: "Calcium Channel Blocker", adherence: 52 },
-    { name: "Metoprolol", dose: "25mg", type: "Beta Blocker", adherence: 38 },
-  ],
-  readings: [
-    { date: "Jan 15, 2025", time: "14:30", systolic: 185, diastolic: 110, status: "Critical" },
-    { date: "Jan 15, 2025", time: "08:15", systolic: 178, diastolic: 105, status: "High" },
-    { date: "Jan 14, 2025", time: "19:45", systolic: 172, diastolic: 98, status: "High" },
-    { date: "Jan 14, 2025", time: "12:20", systolic: 165, diastolic: 95, status: "Elevated" },
-  ],
+  name: `Patient ${id}`,
+  priority: "Moderate" as const,
+  bp: "—/—",
+  bpTime: "No data",
+  trend: "stable" as const,
+  adherence: 0,
+  lastContact: "Unknown",
+  avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${id}`,
+  age: 0,
+  gender: "Unknown",
+  condition: "Loading...",
+  riskLevel: "Medium",
+  medications: [] as { name: string; dose: string; type: string; adherence: number }[],
+  readings: [] as { date: string; time: string; systolic: number; diastolic: number; status: string }[],
 });
 
 const CustomTooltip = ({ active, payload, label }: any) => {
