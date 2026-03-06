@@ -16,7 +16,6 @@ import {
   Clock,
   AlertTriangle,
   Download,
-  ClipboardEdit,
   Send,
   Bell,
   X,
@@ -788,15 +787,7 @@ export default function PatientDetails() {
         <div className="space-y-6">
           {/* Current Medications */}
           <div className="card">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-bold text-gray-900">Current Medications</h3>
-              <button 
-                onClick={() => setDrawerOpen(true)}
-                className="text-gray-400 hover:text-magenta-600"
-              >
-                <ClipboardEdit size={18} />
-              </button>
-            </div>
+            <h3 className="font-bold text-gray-900 mb-4">Current Medications</h3>
             <div className="space-y-4">
               {patient.medications.map((med: { name: string; dose: string; type: string; adherence: number }, index: number) => (
                 <div key={index} className="rounded-xl border border-gray-100 p-4">
