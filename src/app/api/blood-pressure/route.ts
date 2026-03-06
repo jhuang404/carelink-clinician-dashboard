@@ -54,17 +54,17 @@ export async function POST(request: NextRequest) {
     // Calculate status based on BP values
     const status = getReadingStatus(body.systolic, body.diastolic);
 
-    const readingData: Omit<BPReading, "id"> = {
+    const readingData: Record<string, any> = {
       patientId: body.patientId,
       systolic: body.systolic,
       diastolic: body.diastolic,
-      pulse: body.pulse,
       timestamp: new Date().toISOString(),
       source: body.source || "patient-app",
-      deviceId: body.deviceId,
       status,
-      patientNote: body.patientNote,
     };
+    if (body.pulse != null) readingData.pulse = body.pulse;
+    if (body.deviceId) readingData.deviceId = body.deviceId;
+    if (body.patientNote) readingData.patientNote = body.patientNote;
 
     // If Firebase is not configured, return success with mock ID
     if (!isAdminConfigured) {
