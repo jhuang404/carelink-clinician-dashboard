@@ -1,9 +1,7 @@
 /**
  * API ROUTE: /api/alerts
  * 
- * Handles alert operations for clinicians.
- * 
- * GET  - Retrieve all alerts
+ * GET  - Retrieve all alerts (with real patient names from patients collection)
  * PATCH - Update alert status
  */
 
@@ -14,9 +12,8 @@ import type { Alert } from "@/types/api";
 /**
  * GET /api/alerts
  * 
- * Query params:
- * - status: filter by status (new, acknowledged, resolved)
- * - severity: filter by severity (critical, warning, info)
+ * Fetches alerts and cross-references patientId with the patients collection
+ * to ensure patientName is always up-to-date.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -24,46 +21,45 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get("status");
     const severity = searchParams.get("severity");
 
-    console.log(`[API /alerts] Request received. Firebase configured: ${isAdminConfigured}`);
-
-    // If Firebase is not configured, return empty array (let frontend handle demo data)
     if (!isAdminConfigured) {
-      console.log("[API /alerts] ⚠️  Firebase not configured - returning empty array");
-      console.log("[API /alerts] Set FIREBASE_ADMIN_PROJECT_ID, FIREBASE_ADMIN_CLIENT_EMAIL, FIREBASE_ADMIN_PRIVATE_KEY in .env.local");
       return NextResponse.json({ alerts: [], total: 0 });
     }
 
-    // Firebase is configured - fetch from Firestore
-    console.log("[API /alerts] ✅ Firebase configured - fetching from Firestore...");
-    const alertsRef = getCollection("alerts");
-    // Simple query without orderBy to avoid index requirement
-    const snapshot = await alertsRef.get();
-    
-    let alerts: Alert[] = [];
+    // Fetch alerts and patients in parallel
+    const [alertsSnap, patientsSnap] = await Promise.all([
+      getCollection("alerts").get(),
+      getCollection("patients").get(),
+    ]);
 
-    snapshot.forEach((doc) => {
-      const data = doc.data();
-      alerts.push({ id: doc.id, ...data } as Alert);
-      console.log(`[API /alerts] Alert: ${doc.id} - ${data.patientName} (${data.patientId})`);
+    // Build patientId → real name lookup
+    const patientNames: Record<string, string> = {};
+    patientsSnap.forEach((doc) => {
+      const d = doc.data();
+      patientNames[doc.id] = `${d.firstName} ${d.lastName}`;
     });
 
-    console.log(`[API /alerts] 📊 Found ${alerts.length} alerts in Firebase`);
+    let alerts: Alert[] = [];
+    alertsSnap.forEach((doc) => {
+      const data = doc.data();
+      const realName = patientNames[data.patientId];
+      alerts.push({
+        id: doc.id,
+        ...data,
+        patientName: realName || data.patientName || `Patient ${data.patientId}`,
+      } as Alert);
+    });
 
-    // Apply filters in memory
     if (status) {
       alerts = alerts.filter(a => a.status === status);
     }
     if (severity) {
       alerts = alerts.filter(a => a.severity === severity);
     }
-    
-    // Sort by createdAt in memory
-    alerts = alerts.sort((a, b) => 
+
+    alerts = alerts.sort((a, b) =>
       new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
 
-    // ALWAYS return real data from Firebase, even if empty
-    // Frontend will decide whether to show demo data or not
     return NextResponse.json({ alerts, total: alerts.length });
 
   } catch (error) {
@@ -77,13 +73,7 @@ export async function GET(request: NextRequest) {
 
 /**
  * PATCH /api/alerts
- * 
  * Update alert status
- * 
- * Body:
- * - alertId: string
- * - status: "new" | "acknowledged" | "resolved"
- * - resolution?: string (required for resolved status)
  */
 export async function PATCH(request: NextRequest) {
   try {
@@ -107,13 +97,13 @@ export async function PATCH(request: NextRequest) {
     const alertsRef = getCollection("alerts");
     const alertDoc = alertsRef.doc(alertId);
 
-    const updateData: any = { status };
-    
+    const updateData: Record<string, string> = { status };
+
     if (status === "acknowledged") {
       updateData.acknowledgedAt = new Date().toISOString();
     } else if (status === "resolved") {
       updateData.resolvedAt = new Date().toISOString();
-      updateData.resolvedBy = "clinician-001"; // TODO: Get from auth context
+      updateData.resolvedBy = "clinician-001";
       if (resolution) {
         updateData.resolution = resolution;
       }
@@ -130,90 +120,4 @@ export async function PATCH(request: NextRequest) {
       { status: 500 }
     );
   }
-}
-
-// Generate demo alerts for when Firebase is not configured
-function generateDemoAlerts(): Alert[] {
-  const now = new Date();
-  
-  return [
-    {
-      id: "demo-alert-1",
-      patientId: "P-2025-001",
-      patientName: "Maria Rodriguez",
-      type: "critical-bp",
-      severity: "critical",
-      status: "new",
-      title: "Severe Hypertension Alert",
-      description: "Patient's blood pressure has exceeded critical threshold. Last medication taken 3 days ago. Immediate intervention required.",
-      relatedReadingId: "reading-demo-1",
-      triggerValue: "185/110",
-      createdAt: new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString(), // 2 hours ago
-    },
-    {
-      id: "demo-alert-2",
-      patientId: "P-2025-002",
-      patientName: "Robert Thompson",
-      type: "critical-bp",
-      severity: "critical",
-      status: "new",
-      title: "Critical BP Reading",
-      description: "Elderly patient with comorbid CKD showing dangerously elevated BP. Risk of hypertensive crisis.",
-      relatedReadingId: "reading-demo-2",
-      triggerValue: "192/118",
-      createdAt: new Date(now.getTime() - 4 * 60 * 60 * 1000).toISOString(), // 4 hours ago
-    },
-    {
-      id: "demo-alert-3",
-      patientId: "P-2025-003",
-      patientName: "James Wilson",
-      type: "high-bp",
-      severity: "warning",
-      status: "acknowledged",
-      title: "Elevated BP Trend",
-      description: "Blood pressure showing consistent upward trend over past week. Patient reported stress from work.",
-      relatedReadingId: "reading-demo-3",
-      triggerValue: "165/95",
-      createdAt: new Date(now.getTime() - 6 * 60 * 60 * 1000).toISOString(), // 6 hours ago
-      acknowledgedAt: new Date(now.getTime() - 5 * 60 * 60 * 1000).toISOString(), // 5 hours ago
-    },
-    {
-      id: "demo-alert-4",
-      patientId: "P-2025-004",
-      patientName: "Linda Martinez",
-      type: "follow-up-due",
-      severity: "warning",
-      status: "new",
-      title: "Medication Adjustment Needed",
-      description: "Recent medication change not showing expected results. Consider dose adjustment or alternative.",
-      relatedReadingId: "reading-demo-4",
-      triggerValue: "148/92",
-      createdAt: new Date(now.getTime() - 8 * 60 * 60 * 1000).toISOString(), // 8 hours ago
-    },
-    {
-      id: "demo-alert-5",
-      patientId: "P-2025-005",
-      patientName: "David Kim",
-      type: "high-bp",
-      severity: "warning",
-      status: "new",
-      title: "Elevated BP During Titration",
-      description: "New patient showing elevated BP during Amlodipine dose titration. Monitor response and consider adjustment.",
-      relatedReadingId: "reading-demo-5",
-      triggerValue: "152/94",
-      createdAt: new Date(now.getTime() - 10 * 60 * 60 * 1000).toISOString(), // 10 hours ago
-    },
-    {
-      id: "demo-alert-6",
-      patientId: "P-2025-011",
-      patientName: "Patricia Lee",
-      type: "missed-reading",
-      severity: "info",
-      status: "new",
-      title: "Missed Reading Alert",
-      description: "Patient has not submitted BP readings for 5 days. Device connectivity issue reported.",
-      triggerValue: "—/—",
-      createdAt: new Date(now.getTime() - 12 * 60 * 60 * 1000).toISOString(), // 12 hours ago
-    },
-  ];
 }
