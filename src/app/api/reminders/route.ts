@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 
+export async function GET() {
+  const hasKey = !!process.env.RESEND_API_KEY;
+  const keyPrefix = process.env.RESEND_API_KEY?.slice(0, 6) || "missing";
+  return NextResponse.json({ hasKey, keyPrefix, nodeEnv: process.env.NODE_ENV });
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { to, patientName, message, method } = await request.json();
