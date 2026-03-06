@@ -10,7 +10,6 @@ import {
   Plus, 
   MessageSquare, 
   Phone, 
-  Download, 
   RefreshCw,
   TrendingUp,
   TrendingDown,
@@ -405,10 +404,6 @@ export default function Dashboard() {
             <option value="adherence">Sort by Adherence</option>
           </select>
         </div>
-        <button className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
-          <Download size={16} className="text-magenta-600" />
-          Export
-        </button>
       </div>
 
       {/* Patient List */}

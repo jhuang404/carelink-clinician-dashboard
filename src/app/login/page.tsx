@@ -111,6 +111,12 @@ export default function LoginPage() {
             </p>
           </div>
         </div>
+
+        {/* T-Mobile co-branding */}
+        <div className="absolute bottom-8 left-0 right-0 z-10 flex flex-col items-center gap-2">
+          <span className="text-[10px] font-medium tracking-widest text-gray-400 uppercase">Powered by</span>
+          <img src="/tmobile-logo.png" alt="T-Mobile" className="h-6 object-contain" />
+        </div>
       </div>
 
       {/* Right: Login Form */}

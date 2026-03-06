@@ -3,7 +3,7 @@
 // Force dynamic rendering to avoid build-time errors
 export const dynamic = 'force-dynamic';
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -169,6 +169,8 @@ export default function PatientDetails() {
   const [readingsStats, setReadingsStats] = useState<any>(null);
   const [patientData, setPatientData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
+  const chartRef = useRef<HTMLDivElement>(null);
 
   // Reminder modal
   const [reminderOpen, setReminderOpen] = useState(false);
@@ -251,6 +253,156 @@ export default function PatientDetails() {
     }
   };
 
+  const handleExportPDF = useCallback(async () => {
+    setExporting(true);
+    try {
+      const { default: jsPDF } = await import("jspdf");
+      const { default: html2canvas } = await import("html2canvas");
+
+      const pdf = new jsPDF("p", "mm", "a4");
+      const pageW = pdf.internal.pageSize.getWidth();
+      const margin = 15;
+      let y = margin;
+
+      const pName = patientData
+        ? `${patientData.firstName} ${patientData.lastName}`
+        : `Patient ${patientId}`;
+
+      // Header
+      pdf.setFontSize(20);
+      pdf.setTextColor(226, 0, 116);
+      pdf.text("CareLink Doctor", margin, y);
+      y += 8;
+      pdf.setFontSize(10);
+      pdf.setTextColor(120, 120, 120);
+      pdf.text(`Blood Pressure Report  •  Generated ${new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}`, margin, y);
+      y += 6;
+      pdf.setDrawColor(230, 230, 230);
+      pdf.line(margin, y, pageW - margin, y);
+      y += 8;
+
+      // Patient info
+      pdf.setFontSize(16);
+      pdf.setTextColor(30, 30, 30);
+      pdf.text(pName, margin, y);
+      y += 6;
+      pdf.setFontSize(10);
+      pdf.setTextColor(100, 100, 100);
+      pdf.text(`ID: ${patientId}  •  DOB: ${patientData?.dateOfBirth || "N/A"}  •  Gender: ${patientData?.gender || "N/A"}`, margin, y);
+      y += 5;
+      pdf.text(`Diagnosis: ${patientData?.diagnosis?.join(", ") || "Hypertension"}`, margin, y);
+      y += 10;
+
+      // Stats summary
+      const stats = readingsStats;
+      const avgSys = stats?.avgSystolic || 0;
+      const avgDia = stats?.avgDiastolic || 0;
+      const total = stats?.totalReadings || bpReadings.length;
+      const perDay = stats?.readingsPerDay || 0;
+
+      pdf.setFillColor(248, 248, 248);
+      pdf.roundedRect(margin, y, pageW - margin * 2, 18, 3, 3, "F");
+      pdf.setFontSize(11);
+      pdf.setTextColor(30, 30, 30);
+      const col = (pageW - margin * 2) / 4;
+      pdf.text(`${avgSys}/${avgDia}`, margin + col * 0 + 4, y + 7);
+      pdf.text(`${total}`, margin + col * 1 + 4, y + 7);
+      pdf.text(`${dailyAverages.length}`, margin + col * 2 + 4, y + 7);
+      pdf.text(`${perDay}`, margin + col * 3 + 4, y + 7);
+      pdf.setFontSize(7);
+      pdf.setTextColor(140, 140, 140);
+      pdf.text("Overall Average", margin + col * 0 + 4, y + 13);
+      pdf.text("Total Readings", margin + col * 1 + 4, y + 13);
+      pdf.text("Days Tracked", margin + col * 2 + 4, y + 13);
+      pdf.text("Avg Readings/Day", margin + col * 3 + 4, y + 13);
+      y += 24;
+
+      // Chart screenshot
+      if (chartRef.current) {
+        const canvas = await html2canvas(chartRef.current, { scale: 2, backgroundColor: "#ffffff" });
+        const imgData = canvas.toDataURL("image/png");
+        const imgW = pageW - margin * 2;
+        const imgH = (canvas.height / canvas.width) * imgW;
+        if (y + imgH > pdf.internal.pageSize.getHeight() - margin) {
+          pdf.addPage();
+          y = margin;
+        }
+        pdf.addImage(imgData, "PNG", margin, y, imgW, imgH);
+        y += imgH + 8;
+      }
+
+      // Daily averages table
+      if (dailyAverages.length > 0) {
+        if (y + 20 > pdf.internal.pageSize.getHeight() - margin) { pdf.addPage(); y = margin; }
+        pdf.setFontSize(12);
+        pdf.setTextColor(30, 30, 30);
+        pdf.text("Daily BP Averages", margin, y);
+        y += 6;
+
+        // Table header
+        pdf.setFontSize(7);
+        pdf.setTextColor(100, 100, 100);
+        const cols = [margin, margin + 30, margin + 58, margin + 86, margin + 114, margin + 140];
+        pdf.text("DATE", cols[0], y);
+        pdf.text("AVG BP", cols[1], y);
+        pdf.text("SYS RANGE", cols[2], y);
+        pdf.text("DIA RANGE", cols[3], y);
+        pdf.text("READINGS", cols[4], y);
+        pdf.text("STATUS", cols[5], y);
+        y += 2;
+        pdf.setDrawColor(230, 230, 230);
+        pdf.line(margin, y, pageW - margin, y);
+        y += 4;
+
+        pdf.setFontSize(8);
+        pdf.setTextColor(50, 50, 50);
+        dailyAverages.slice(0, 14).forEach((da: any) => {
+          if (y + 6 > pdf.internal.pageSize.getHeight() - margin) { pdf.addPage(); y = margin; }
+          const dateStr = new Date(da.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
+          pdf.text(dateStr, cols[0], y);
+          pdf.text(`${da.avgSystolic}/${da.avgDiastolic}`, cols[1], y);
+          pdf.text(`${da.minSystolic}-${da.maxSystolic}`, cols[2], y);
+          pdf.text(`${da.minDiastolic}-${da.maxDiastolic}`, cols[3], y);
+          pdf.text(`${da.readingCount}/5`, cols[4], y);
+          const status = da.status === "critical" ? "Critical" : da.status === "high" ? "High" : da.status === "elevated" ? "Elevated" : "Normal";
+          pdf.text(status, cols[5], y);
+          y += 5;
+        });
+      }
+
+      // Medications
+      if (patientData?.medications?.length > 0) {
+        y += 6;
+        if (y + 20 > pdf.internal.pageSize.getHeight() - margin) { pdf.addPage(); y = margin; }
+        pdf.setFontSize(12);
+        pdf.setTextColor(30, 30, 30);
+        pdf.text("Current Medications", margin, y);
+        y += 6;
+        pdf.setFontSize(9);
+        pdf.setTextColor(50, 50, 50);
+        patientData.medications.forEach((med: any) => {
+          if (y + 5 > pdf.internal.pageSize.getHeight() - margin) { pdf.addPage(); y = margin; }
+          pdf.text(`• ${med.name} ${med.dosage || ""} — ${med.class || ""} (${med.frequency || "Daily"})`, margin + 2, y);
+          y += 5;
+        });
+      }
+
+      // Footer
+      y = pdf.internal.pageSize.getHeight() - 10;
+      pdf.setFontSize(7);
+      pdf.setTextColor(180, 180, 180);
+      pdf.text("CareLink Doctor — Confidential Patient Report. For clinical use only.", margin, y);
+      pdf.text(`Dr. Sarah Chen • Cardiology`, pageW - margin - 40, y);
+
+      pdf.save(`BP-Report-${pName.replace(/\s+/g, "-")}-${new Date().toISOString().slice(0, 10)}.pdf`);
+    } catch (err) {
+      console.error("PDF export failed:", err);
+      alert("Failed to generate PDF report");
+    } finally {
+      setExporting(false);
+    }
+  }, [patientId, patientData, readingsStats, dailyAverages, bpReadings]);
+
   // Convert API patient data to component format
   const latestReading = bpReadings[0];
   const bpTrend = (
@@ -328,8 +480,24 @@ export default function PatientDetails() {
   const readingsPerDay = readingsStats?.readingsPerDay || 0;
 
   const handleSavePlan = async (plan: TreatmentPlan) => {
-    console.log("Saving treatment plan from details page:", plan);
-    await new Promise(resolve => setTimeout(resolve, 500));
+    const medications = plan.medications.map(med => ({
+      name: med.name,
+      dosage: med.dose,
+      class: med.type,
+      frequency: med.frequency,
+    }));
+    const res = await fetch(`/api/patients/${patientId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ medications }),
+    });
+    if (!res.ok) throw new Error("Failed to save");
+    // Refresh patient data
+    const patientRes = await fetch(`/api/patients/${patientId}`);
+    if (patientRes.ok) {
+      const json = await patientRes.json();
+      setPatientData(json.patient || json);
+    }
   };
 
   const patientForDrawer: Patient = {
@@ -345,10 +513,7 @@ export default function PatientDetails() {
   };
 
   return (
-    <div className={cn(
-      "space-y-6 transition-all duration-300",
-      drawerOpen && "mr-[560px]"
-    )}>
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
@@ -483,14 +648,23 @@ export default function PatientDetails() {
                   <option value="30">Last 30 days</option>
                   <option value="90">Last 90 days</option>
                 </select>
-                <button className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100">
-                  <Download size={16} />
+                <button
+                  onClick={handleExportPDF}
+                  disabled={exporting}
+                  className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 disabled:opacity-50"
+                  title="Export PDF Report"
+                >
+                  {exporting ? (
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-gray-400 border-t-transparent" />
+                  ) : (
+                    <Download size={16} />
+                  )}
                 </button>
               </div>
             </div>
             
             {/* Chart */}
-            <div className="h-72">
+            <div className="h-72" ref={chartRef}>
               <ResponsiveContainer width="100%" height="100%">
                 {chartView === "daily-avg" && dailyAvgChartData.length > 0 ? (
                   <ComposedChart data={dailyAvgChartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
@@ -979,6 +1153,7 @@ export default function PatientDetails() {
         patient={patientForDrawer}
         onClose={() => setDrawerOpen(false)}
         onSave={handleSavePlan}
+        initialMedications={patientData?.medications}
       />
     </div>
   );

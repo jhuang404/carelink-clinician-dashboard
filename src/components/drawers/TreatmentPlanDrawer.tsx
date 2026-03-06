@@ -21,6 +21,7 @@ interface TreatmentPlanDrawerProps {
   patient: Patient | null;
   onClose: () => void;
   onSave: (plan: TreatmentPlan) => Promise<void>;
+  initialMedications?: { name: string; dosage: string; class: string; frequency?: string }[];
 }
 
 // Mock data - in production this would come from API
@@ -50,21 +51,30 @@ const getMockTreatmentPlan = (patientId: string): TreatmentPlan => ({
   updatedAt: new Date().toISOString(),
 });
 
-export function TreatmentPlanDrawer({ open, patient, onClose, onSave }: TreatmentPlanDrawerProps) {
+export function TreatmentPlanDrawer({ open, patient, onClose, onSave, initialMedications }: TreatmentPlanDrawerProps) {
   const [plan, setPlan] = useState<TreatmentPlan | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [activeTab, setActiveTab] = useState<"medications" | "monitoring" | "lifestyle">("medications");
 
-  // Load treatment plan when patient changes
   useEffect(() => {
     if (patient) {
-      // In production: fetch from API
-      const mockPlan = getMockTreatmentPlan(patient.id);
-      setPlan(mockPlan);
+      const basePlan = getMockTreatmentPlan(patient.id);
+      if (initialMedications && initialMedications.length > 0) {
+        basePlan.medications = initialMedications.map((med, i) => ({
+          id: String(i + 1),
+          name: med.name,
+          type: med.class || "",
+          dose: med.dosage || "",
+          frequency: med.frequency || "Once daily",
+          time: "09:00 AM",
+          instructions: "",
+        }));
+      }
+      setPlan(basePlan);
       setSaved(false);
     }
-  }, [patient?.id]);
+  }, [patient?.id, initialMedications]);
 
   const handleSave = async () => {
     if (!plan) return;
