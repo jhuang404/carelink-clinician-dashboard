@@ -190,7 +190,7 @@ export default function PatientDetails() {
         const patientRes = await fetch(`/api/patients/${patientId}`);
         if (patientRes.ok) {
           const patientJson = await patientRes.json();
-          setPatientData(patientJson);
+          setPatientData(patientJson.patient || patientJson);
         }
         
         // Fetch BP readings (increased limit for 5 readings/day)
