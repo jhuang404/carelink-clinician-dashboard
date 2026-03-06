@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Activity, Eye, EyeOff, Lock, Mail, ArrowRight } from "lucide-react";
+import { Activity, Eye, EyeOff, Lock, Mail, ArrowRight, Heart } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function LoginPage() {
@@ -39,51 +39,83 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen">
-      {/* Left: Branding Panel */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-magenta-600 via-magenta-700 to-magenta-900 text-white flex-col justify-between p-12 relative overflow-hidden">
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-20 -left-10 w-72 h-72 rounded-full bg-white/20 blur-3xl" />
-          <div className="absolute bottom-32 right-10 w-96 h-96 rounded-full bg-white/10 blur-3xl" />
-        </div>
+      {/* Left: Textured decorative panel */}
+      <div className="hidden lg:flex lg:w-1/2 bg-[#faf8f9] flex-col items-center justify-center p-12 relative overflow-hidden">
+        {/* SVG texture layer */}
+        <svg className="absolute inset-0 w-full h-full" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
+          {/* Large arc - top right */}
+          <circle cx="85%" cy="-10%" r="55%" fill="none" stroke="#e8d5de" strokeWidth="1" />
+          <circle cx="85%" cy="-10%" r="48%" fill="none" stroke="#f0e0e8" strokeWidth="0.5" />
+          {/* Large arc - bottom left */}
+          <circle cx="-5%" cy="110%" r="60%" fill="none" stroke="#e8d5de" strokeWidth="1" />
+          <circle cx="-5%" cy="110%" r="52%" fill="none" stroke="#f0e0e8" strokeWidth="0.5" />
+          {/* Accent horizontal line with pulse shape */}
+          <line x1="0" y1="50%" x2="38%" y2="50%" stroke="#d6336c" strokeWidth="2.5" strokeOpacity="0.35" />
+          <polyline points="190,50% 200,48% 210,54% 218,46% 226,56% 234,48% 244,50%" stroke="#d6336c" strokeWidth="2.5" strokeOpacity="0.35" fill="none" strokeLinecap="round" strokeLinejoin="round" style={{ transform: 'translateY(0)' }} />
+          {/* Halftone dot grid - top right */}
+          {Array.from({ length: 8 }).map((_, row) =>
+            Array.from({ length: 8 }).map((_, col) => (
+              <circle
+                key={`dot-tr-${row}-${col}`}
+                cx={`${78 + col * 2.5}%`}
+                cy={`${8 + row * 2.5}%`}
+                r={Math.max(1, 3.5 - (row + col) * 0.3)}
+                fill="#d6336c"
+                fillOpacity={Math.max(0.04, 0.2 - (row + col) * 0.02)}
+              />
+            ))
+          )}
+          {/* Halftone dot grid - bottom left */}
+          {Array.from({ length: 6 }).map((_, row) =>
+            Array.from({ length: 6 }).map((_, col) => (
+              <circle
+                key={`dot-bl-${row}-${col}`}
+                cx={`${6 + col * 2.5}%`}
+                cy={`${72 + row * 2.5}%`}
+                r={Math.max(1, 3 - (row + col) * 0.3)}
+                fill="#d6336c"
+                fillOpacity={Math.max(0.03, 0.15 - (row + col) * 0.015)}
+              />
+            ))
+          )}
+          {/* Small accent circle */}
+          <circle cx="28%" cy="22%" r="18" fill="none" stroke="#d6336c" strokeWidth="1.5" strokeOpacity="0.2" />
+          <circle cx="72%" cy="78%" r="12" fill="#d6336c" fillOpacity="0.08" />
+        </svg>
 
-        <div className="relative z-10">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20 backdrop-blur-sm">
-              <Activity size={24} />
-            </div>
-            <span className="text-2xl font-bold">CareLink Doctor</span>
+        {/* Heartbeat SVG line across center (rendered separately for precise control) */}
+        <svg className="absolute left-0 w-full" style={{ top: '50%', transform: 'translateY(-50%)' }} height="40" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
+          <path
+            d="M0,20 L180,20 L195,20 L205,6 L215,34 L225,8 L235,30 L245,14 L255,20 L1200,20"
+            stroke="#d6336c"
+            strokeWidth="2.5"
+            strokeOpacity="0.3"
+            fill="none"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+
+        {/* Center content */}
+        <div className="relative z-10 flex flex-col items-center text-center space-y-8">
+          <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-magenta-600 text-white shadow-lg shadow-magenta-200/50">
+            <Activity size={40} />
           </div>
-        </div>
 
-        <div className="relative z-10 space-y-6">
-          <h1 className="text-4xl font-bold leading-tight">
-            Remote Patient<br />Monitoring Dashboard
-          </h1>
-          <p className="text-lg text-magenta-100 max-w-md">
-            Monitor blood pressure readings, manage alerts, and communicate with patients — all in one secure platform.
-          </p>
-          <div className="flex gap-8 pt-4">
-            {[
-              { value: "Real-time", label: "BP Monitoring" },
-              { value: "Smart", label: "Alert System" },
-              { value: "Secure", label: "Messaging" },
-            ].map((item) => (
-              <div key={item.label}>
-                <p className="text-xl font-bold">{item.value}</p>
-                <p className="text-sm text-magenta-200">{item.label}</p>
-              </div>
-            ))}
+          <div className="space-y-3">
+            <h1 className="text-3xl font-bold text-gray-900">
+              CareLink <span className="text-magenta-600">Doctor</span>
+            </h1>
+            <p className="text-gray-500 max-w-xs text-sm">
+              Remote patient monitoring for better care
+            </p>
           </div>
-        </div>
-
-        <div className="relative z-10 text-sm text-magenta-200">
-          HIPAA Compliant &middot; End-to-End Encrypted
         </div>
       </div>
 
       {/* Right: Login Form */}
-      <div className="flex flex-1 items-center justify-center p-8 bg-gray-50">
-        <div className="w-full max-w-md space-y-8">
+      <div className="flex flex-1 items-center justify-center p-8 bg-white">
+        <div className="w-full max-w-sm space-y-8">
           {/* Mobile logo */}
           <div className="lg:hidden flex items-center gap-2 justify-center mb-4">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-magenta-600 text-white">
@@ -94,9 +126,9 @@ export default function LoginPage() {
             </span>
           </div>
 
-          <div className="text-center lg:text-left">
+          <div>
             <h2 className="text-2xl font-bold text-gray-900">Welcome back</h2>
-            <p className="mt-2 text-gray-500">Sign in to your clinician account</p>
+            <p className="mt-1 text-sm text-gray-500">Sign in to your account</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
@@ -107,9 +139,7 @@ export default function LoginPage() {
             )}
 
             <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-gray-700">
-                Email Address
-              </label>
+              <label className="block text-sm font-medium text-gray-700">Email</label>
               <div className="relative">
                 <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                 <input
@@ -125,9 +155,7 @@ export default function LoginPage() {
             </div>
 
             <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-gray-700">
-                Password
-              </label>
+              <label className="block text-sm font-medium text-gray-700">Password</label>
               <div className="relative">
                 <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                 <input
@@ -177,9 +205,9 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="rounded-lg bg-gray-100 px-4 py-3 text-center">
+          <div className="rounded-lg bg-gray-50 border border-gray-100 px-4 py-3 text-center">
             <p className="text-xs text-gray-500">
-              Demo credentials: <span className="font-mono font-medium text-gray-700">sarah.chen@carelink.health</span> / <span className="font-mono font-medium text-gray-700">carelink2025</span>
+              Demo: <span className="font-mono font-medium text-gray-700">sarah.chen@carelink.health</span> / <span className="font-mono font-medium text-gray-700">carelink2025</span>
             </p>
           </div>
         </div>
