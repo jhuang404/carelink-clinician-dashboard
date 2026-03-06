@@ -15,10 +15,10 @@ export default function Header() {
 
       <Link 
         href="/alerts"
-        className="flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 hover:bg-gray-50 hover:text-magenta-600 transition-colors"
+        className="text-gray-500 hover:text-magenta-600 transition-colors"
         title="View alerts"
       >
-        <Bell size={18} />
+        <Bell size={20} />
       </Link>
     </header>
   );
