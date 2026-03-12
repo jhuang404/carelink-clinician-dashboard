@@ -1,122 +1,152 @@
 # CareLink Clinician Dashboard
 
-A clinician-facing dashboard for remote patient monitoring (RPM) of hypertension patients.
+Clinician-facing hypertension RPM dashboard built with Next.js, Firebase, and App Router APIs.
 
-> **Note**: This is an MVP demo with synthetic data. Not intended for production use with real patient data.
+> **Important**: This project is a demo/MVP for product validation. Do not use with real PHI/production clinical workflows without security and compliance hardening.
 
-## Features
+## Current Features
 
-### Patient Overview Dashboard
-- Triage view with priority-based patient list (Critical / Moderate / Follow-up / Stable)
-- Row-level actions: Edit Plan, Message, Call
-- Click patient row to navigate to Patient Details
-- Search and sort functionality
+### 1) Clinician auth and app shell
+- Login/logout flow with session persisted in `localStorage`
+- Protected pages via `AuthProvider` + route redirect (`/login` vs app pages)
+- Responsive shell (`Sidebar` + `Header`) for all authenticated pages
+- Co-branded login screen with T-Mobile logo
 
-### Treatment Plan Drawer
-- Quick edit prescriptions without leaving the dashboard
-- Right-side drawer maintains list context
-- Medications, monitoring schedule, lifestyle recommendations
+Demo login:
+- Email: `sarah.chen@carelink.health`
+- Password: `carelink2025`
 
-### Alert Management
-- Clear alert states: New → Acknowledged → Resolved
-- Primary action buttons with unambiguous outcomes
-- Secondary actions (Call/Message) do not change alert state
+### 2) Patient overview dashboard (`/`)
+- Risk-priority patient list with quick actions
+- Latest BP shown in overview for real-time visibility
+- Daily aggregate data support for multi-reading-per-day patients
+- Add patient workflow via drawer
 
-### Secure Messaging
-- 2-column layout: conversation list + chat thread
-- Patient and caregiver conversations
-- Role-based message alignment (Patient / Caregiver / Clinician)
-- Unread badges and mark-as-read behavior
+### 3) Patient details (`/patients/[id]`)
+- BP history charts (daily average + individual readings)
+- Recent individual readings table
+- Current medication list from patient profile
+- `Adjust Medication` drawer with editable meds
+- Medication changes persisted through `PUT /api/patients/[id]`
+- PDF report export (chart + stats + daily averages + medication summary)
 
-### Analytics Dashboard
-- Admin preview (not for clinical decision-making)
-- Population health trends, adherence metrics, risk stratification
-- Drill-down links to patient-level views
-- Aggregated synthetic data
+### 4) Alert management and messaging
+- Alert triage workflow and state updates
+- Message entry points from overview/alerts/details pages
+- Message page with patient-context routing
 
-### Patient Details
-- Blood pressure history chart (Recharts)
-- Current medications with adherence tracking
-- Recent readings table
-- Quick actions: Adjust Medication, Schedule Follow-up
+### 5) Send BP reminder (email/SMS demo)
+- Reminder modal in patient details page
+- Email delivery via `POST /api/reminders` using Resend API
+- Editable recipient field and patient-aware message template
+- SMS path currently returns demo success response (no provider wired yet)
+
+## System Architecture
+
+The app uses a standard App Router pattern with API routes colocated in `src/app/api`.
+
+- **UI layer**: Next.js pages + reusable drawer/components
+- **State/auth layer**: `AuthContext` for clinician session and access control
+- **Server layer**: Route handlers under `src/app/api/*`
+- **Data layer**: Firestore via Firebase Admin SDK (`src/lib/firebase-admin`)
+- **Fallback mode**: demo data returned when Firebase admin config is missing
+
+## Data Flow (High Level)
+
+1. Clinician logs in on `/login`
+2. Frontend fetches data from internal APIs (`/api/patients`, `/api/readings`, `/api/alerts`, etc.)
+3. API routes read/write Firestore collections (`patients`, `readings`, `alerts`, `clinicianNotes`)
+4. BP submissions through `/api/blood-pressure` are saved and may auto-create alerts
+5. Reminder requests through `/api/reminders` call Resend for email delivery
+
+## API Routes
+
+Implemented routes in `src/app/api`:
+
+- `GET /api/patients` - list patients (+ filter/search query params)
+- `POST /api/patients` - create patient
+- `GET /api/patients/[id]` - patient profile + recent readings + notes
+- `PUT /api/patients/[id]` - update patient fields (including medications)
+- `DELETE /api/patients/[id]` - delete patient
+- `GET /api/readings` / `POST /api/readings` - reading retrieval/ingest
+- `POST /api/blood-pressure` - iOS-compatible BP ingest alias
+- `GET /api/alerts` / `PATCH /api/alerts` - alert list and state updates
+- `GET /api/notes` / `POST /api/notes` / `DELETE /api/notes/[id]` - clinician notes APIs
+- `POST /api/reminders` - email reminder (Resend) + SMS demo response
 
 ## Tech Stack
 
-- **Framework**: Next.js 14 (App Router)
-- **Language**: TypeScript
+- **Framework**: Next.js 16 (App Router)
+- **Language**: TypeScript + React 19
 - **Styling**: Tailwind CSS
 - **Charts**: Recharts
-- **Icons**: Lucide React
+- **PDF Export**: `jspdf` + `html2canvas`
+- **Data**: Firebase Firestore + Firebase Admin SDK
+- **Email**: Resend REST API
 
-## Getting Started
+## Local Setup
+
+### 1) Install and run
 
 ```bash
-# Install dependencies
 npm install
-
-# Run development server
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+Open [http://localhost:3000](http://localhost:3000).
+
+### 2) Environment variables
+
+Copy `.env.example` to `.env.local` and fill Firebase keys.
+
+For reminder email, also set:
+
+```bash
+RESEND_API_KEY=your_resend_api_key
+```
+
+Without Firebase admin config, the app runs in demo fallback mode for most read paths.
+
+## Deployment Notes (Vercel)
+
+- Production branch should be `main`
+- Set all env vars in Vercel Project Settings
+- Redeploy after env var changes
+- If auto-deploy appears stale, trigger a manual redeploy from the latest `main` commit
 
 ## Project Structure
 
-```
+```text
 src/
-├── app/
-│   ├── page.tsx              # Patient Overview Dashboard
-│   ├── alerts/page.tsx       # Alert Management
-│   ├── messages/page.tsx     # Secure Messaging
-│   ├── analytics/page.tsx    # Analytics Dashboard
-│   ├── patients/[id]/page.tsx # Patient Details
-│   └── layout.tsx            # Root layout
-├── components/
-│   ├── Header.tsx
-│   ├── Sidebar.tsx
-│   ├── ui/Drawer.tsx         # Reusable drawer component
-│   └── drawers/
-│       └── TreatmentPlanDrawer.tsx
-├── data/
-│   ├── demoPatients.ts       # Synthetic patient data
-│   └── demoMessages.ts       # Synthetic conversation data
-├── types/
-│   ├── index.ts              # Patient, TreatmentPlan types
-│   └── messages.ts           # Conversation, Message types
-└── lib/
-    └── utils.ts              # Utility functions (cn)
+  app/
+    login/page.tsx
+    page.tsx
+    alerts/page.tsx
+    messages/page.tsx
+    analytics/page.tsx
+    patients/[id]/page.tsx
+    api/
+      patients/
+      readings/
+      alerts/
+      blood-pressure/
+      notes/
+      reminders/
+  components/
+    Header.tsx
+    Sidebar.tsx
+    AppShell.tsx
+    ui/Drawer.tsx
+    drawers/TreatmentPlanDrawer.tsx
+  contexts/AuthContext.tsx
+  lib/firebase-admin.ts
 ```
 
-## Demo Data
+## Security and Compliance Notes
 
-The dashboard uses synthetic data representing clinical scenarios:
-
-| Patient | Priority | Scenario |
-|---------|----------|----------|
-| Maria Rodriguez | Critical | High BP (185/110), low adherence |
-| James Wilson | Moderate | Rising trend, needs attention |
-| Sarah Johnson | Stable | Well-controlled, high adherence |
-| Michael Chen | Follow-up | Quarterly review due |
-| ... | ... | ... |
-
-## Design Principles
-
-1. **Operations Console, Not Reporting Dashboard**: Patient list = task list
-2. **Row-Level Actions > Global Navigation**: Edit plans without context switching
-3. **Unambiguous Click Semantics**: Row click = details; Edit Plan = drawer
-4. **Clear State Transitions**: Every action has a predictable outcome
-5. **Honest Demo**: Clearly labeled as synthetic/demo data
-
-## TODO (Backend Integration)
-
-- [ ] `GET /api/patients` - Fetch patient list
-- [ ] `GET /api/patients/:id` - Fetch patient details
-- [ ] `PATCH /api/patients/:id/treatment-plan` - Update treatment plan
-- [ ] `GET /api/alerts` - Fetch alerts
-- [ ] `PATCH /api/alerts/:id` - Update alert status
-- [ ] `GET /api/messages/conversations` - Fetch conversations
-- [ ] `POST /api/messages/:conversationId` - Send message
-- [ ] Audit logging for HIPAA compliance
+- This repository currently includes demo-oriented auth/session behavior
+- No HIPAA-grade audit trail or enterprise IAM integration yet
+- Do not store real patient PHI until security controls are implemented
 
 ## License
 
